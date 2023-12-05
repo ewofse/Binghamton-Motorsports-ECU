@@ -44,7 +44,7 @@ bool ReadyToDrive(bool * isAlreadyReady, int buttonPin, int brakePin)
 }
 
 // Average the signal
-int AverageSignal(int initialPedalSignal, int finalPedalSignal, int * pin, int * total, \
+int AverageSignal(int initialPedalSignal, int finalPedalSignal, const int pin, int * total, \
     int * counter, int array[], int * average)
 {
     short int temp;
@@ -52,6 +52,7 @@ int AverageSignal(int initialPedalSignal, int finalPedalSignal, int * pin, int *
     // Read voltage signal
     initialPedalSignal = analogRead(pin);
     Serial.println(initialPedalSignal);
+    Serial.println();
 
     // Set pedal signal to max value if signal read in is greater
     if(initialPedalSignal > 1023)
@@ -89,8 +90,6 @@ int AverageSignal(int initialPedalSignal, int finalPedalSignal, int * pin, int *
     Serial.println("2 byte value:");
     Serial.println(finalPedalSignal);
     Serial.println();
-
-    delay(500);
 
     return finalPedalSignal;
 }

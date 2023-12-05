@@ -4,6 +4,9 @@ FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> Can1;
 
 CAN_message_t TransmittingSpeedCommandValue;
 
+int accelPedal1023;
+int accelPedal65535;
+
 bool isAlreadyReady = false;
 
 int accelPedal;
@@ -23,7 +26,7 @@ void setup()
     // Serial communication
     Serial.begin(115200);
 
-    // pinMode(brakePin, OUTPUT);
+    //pinMode(brakePin, OUTPUT);
 
     InitializeArray(array, ARRAY_SIZE);
 }
@@ -38,4 +41,11 @@ void loop()
         Serial.println("This should not be printing");
         Serial.println();
     }
+
+    accelPedal65535 = AverageSignal(accelPedal1023, accelPedal65535, accelPin, &total, \
+      &counter, array, &average);
+    
+    Serial.println(accelPedal65535);
+    Serial.println();
+    delay(500);
 }

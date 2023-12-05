@@ -16,14 +16,14 @@
 #define ARRAY_SIZE 40
 
 // Constants
-const int buttonPin = 30;
-const int brakePin = 23;
-const int accelPin = 23;
+const int buttonPin = 31;
+const int brakePin = 22;
+const int accelPin = 22;
 
 // Prototypes
 bool ReadyToDrive(bool * isAlreadyReady, int buttonPin, int brakePin);
 
-int AverageSignal(int initialPedalSignal, int finalPedalSignal, int * pin, int * total, \
+int AverageSignal(int initialPedalSignal, int finalPedalSignal, const int pin, int * total, \
     int * counter, int array[], int * average);
 
 void InitializeArray(int array[], int size);
