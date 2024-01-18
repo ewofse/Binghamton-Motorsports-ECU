@@ -21,7 +21,10 @@ bool ReadyToDrive(bool * isAlreadyReady, int buttonPin, int brakePin)
         return *isAlreadyReady;
     }
 
-    Serial.println(analogRead(brakePin));
+    Serial.println(digitalRead(buttonPin));
+    Serial.println();
+
+    Serial.println(digitalRead(brakePin));
     Serial.println();
 
     // Check if button and brake are pressed
@@ -51,8 +54,9 @@ int AverageSignal(int initialPedalSignal, int finalPedalSignal, const int pin, i
 
     // Read voltage signal
     initialPedalSignal = analogRead(pin);
-    Serial.println(initialPedalSignal);
-    Serial.println();
+
+    // Serial.println(initialPedalSignal);
+    // Serial.println();
 
     // Set pedal signal to max value if signal read in is greater
     if(initialPedalSignal > 1023)
@@ -76,20 +80,20 @@ int AverageSignal(int initialPedalSignal, int finalPedalSignal, const int pin, i
 
     temp = *average;
 
-    Serial.println("Average:");
-    Serial.println(temp);
-    Serial.println();
+    // Serial.println("Average:");
+    // Serial.println(temp);
+    // Serial.println();
 
     // Map value to a 2 byte value
     finalPedalSignal = (65536 * temp) / 1023;
 
-    Serial.println("10 bit value:");
-    Serial.println(temp);
-    Serial.println();
+    // Serial.println("10 bit value:");
+    // Serial.println(temp);
+    // Serial.println();
 
-    Serial.println("2 byte value:");
-    Serial.println(finalPedalSignal);
-    Serial.println();
+    // Serial.println("2 byte value:");
+    // Serial.println(finalPedalSignal);
+    // Serial.println();
 
     return finalPedalSignal;
 }
