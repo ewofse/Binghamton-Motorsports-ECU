@@ -17,8 +17,8 @@
 
 // Constants
 const int buttonPin = 31;
-const int brakePin = 22;
-const int accelPin = 22;
+const int brakePin = 23;
+const int accelPin = 23;
 
 // Prototypes
 bool ReadyToDrive(bool * isAlreadyReady, int buttonPin, int brakePin);
@@ -28,18 +28,6 @@ int AverageSignal(int initialPedalSignal, int finalPedalSignal, const int pin, i
 
 void InitializeArray(int array[], int size);
 void SendPedalMessage(int finalPedalSignal, CAN_message_t messageValue);
-
-/*
-    Ready to drive:
-
-    The car should be ready to drive when:
-        1. The driver presses the "start engine" button
-        2. The driver is pressing the brake
-    
-    Once the car is ready to drive... it should bypass the check
-    Brake pedal functionality should 
-
-*/
 
 // End safe guards
 #endif
