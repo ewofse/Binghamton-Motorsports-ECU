@@ -36,16 +36,8 @@ void loop()
     // Check ready to drive state
     isAlreadyReady = ReadyToDrive(&isAlreadyReady, buttonPin, brakePin);
 
-    if(isAlreadyReady)
-    {
-        Serial.println("This should not be printing");
-        Serial.println();
-    }
-
     accelPedal65535 = AverageSignal(accelPedal1023, accelPedal65535, accelPin, &total, \
       &counter, array, &average);
-    
-    Serial.println(accelPedal65535);
-    Serial.println();
+
     delay(500);
 }
