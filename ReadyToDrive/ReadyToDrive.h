@@ -16,9 +16,12 @@
 #define ARRAY_SIZE 40
 
 // Constants
-const int buttonPin = 31;
-const int brakePin = 23;
-const int accelPin = 23;
+const int buttonPin = 32;
+const int brakePin = 20;
+const int accelPin = 20;
+
+const int accelMessage = 0x201;
+const int brakeMessage = 0x000;
 
 // Prototypes
 bool ReadyToDrive(bool * isAlreadyReady, int buttonPin, int brakePin);
@@ -27,7 +30,8 @@ int AverageSignal(int initialPedalSignal, int finalPedalSignal, const int pin, i
     int * counter, int array[], int * average);
 
 void InitializeArray(int array[], int size);
-void SendPedalMessage(int finalPedalSignal, CAN_message_t messageValue);
+
+void SendPedalMessage(int finalPedalSignal, CAN_message_t messageValue, int messageID);
 
 // End safe guards
 #endif

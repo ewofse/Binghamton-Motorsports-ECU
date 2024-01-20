@@ -7,10 +7,10 @@ CAN_message_t TransmittingSpeedCommandValue;
 int accelPedal1023;
 int accelPedal65535;
 
-bool isAlreadyReady = false;
+int brakePedal1023;
+int brakePedal65535;
 
-int accelPedal;
-int brakePedal;
+bool isAlreadyReady = false;
 
 int total = 0;
 int average = 0;  
@@ -24,10 +24,9 @@ void setup()
     Can1.setBaudRate(500000);
 
     // Serial communication
-    Serial.begin(115200);
+    Serial.begin(9600);
 
-    //pinMode(brakePin, OUTPUT);
-
+    // Set array elements to 0
     InitializeArray(array, ARRAY_SIZE);
 }
 
@@ -36,8 +35,24 @@ void loop()
     // Check ready to drive state
     isAlreadyReady = ReadyToDrive(&isAlreadyReady, buttonPin, brakePin);
 
-    accelPedal65535 = AverageSignal(accelPedal1023, accelPedal65535, accelPin, &total, \
-      &counter, array, &average);
+    // Send commands when RTD
+    if(isAlreadyReady)
+    {
+        // Reduce noise from accelerator signal
+        accelPedal65535 = AverageSignal(accelPedal1023, accelPedal65535, accelPin, \
+          &total, &counter, array, &average);
 
-    delay(500);
+        // Serial.print("Averaged accelerator pedal signal: ");
+        // Serial.println(accelPedal65535);
+        // Serial.println();
+
+        // Reduce noise from brake signal
+        brakePedal65535 = AverageSignal(brakePedal1023, brakePedal65535, brakePin, \
+            &total, &counter, array, &average);
+
+        // Send revsied signal to motor
+        SendPedalMessage(accelPedal65535, TransmittingSpeedCommandValue, accelMessage);
+    }
+
+    // delay(500);
 }
