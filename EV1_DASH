@@ -1,0 +1,115 @@
+import tkinter as tk
+from tkinter import ttk
+from tkdial import Meter
+from datetime import datetime
+
+# Global variable to track whether the spacebar is being pressed
+accelerating = False
+value_speedometer = 0
+value_rpm = 0
+mph = 0
+
+def update_progress(event):
+    progress['value'] = event.x / progress['length'] * 100
+
+def key_press(event):
+    global accelerating
+    if event.keysym == 'space':
+        accelerating = True
+
+def key_release(event):
+    global accelerating
+    if event.keysym == 'space':
+        accelerating = False
+
+def update_dials():
+    global value_speedometer, value_rpm, mph  # Declare 'value' and 'rpm' as global
+    if accelerating:
+        # Increment the dial values
+        value_speedometer += 1
+        value_rpm += 1
+        mph += 1
+        meter1.set(value_speedometer) 
+        meter2.set(value_rpm)
+    else:
+        value_speedometer -= 1 if value_speedometer > 0 else 0
+        value_rpm -= 1 if value_rpm > 0 else 0
+        mph -= 1 if mph > 0 else 0 
+        meter1.set(value_speedometer) 
+        meter2.set(value_rpm)
+   
+    # Update the RPM label
+    rpm_label.config(text=f"{mph}")
+    
+    # Schedule the next update
+    app.after(10, update_dials)
+
+def update_clock():
+    current_time = datetime.now().strftime("%I:%M:%S %p")  # 12-hour format
+    label_time.config(text=current_time)
+    app.after(1000, update_clock)
+
+app = tk.Tk()
+app.geometry("800x450")
+app.configure(bg='black')
+
+label_time = tk.Label(app, text="", font=("Loma", 12), fg="white", bg="black")
+label_time.grid(row=0, column=1)
+
+label_temp = tk.Label(app, text="65°F", font=("Loma", 12), fg="white", bg="black")
+label_temp.grid(row=0, column=2, padx=20)
+
+meter1 = Meter(app, radius=250, start=0, end=120, border_width=3,
+               fg="black", text_color="white", start_angle=270, 
+               end_angle=-270, text_font="DS-Digital 30", 
+               scale_color="white", needle_color="snow", border_color="maroon")
+meter1.set_mark(100, 120)  # set red marking from 140 to 160
+
+meter1.grid(row=1, column=0, padx=20, pady=30)
+
+meter2 = Meter(app, radius=250, start=0, end=100, border_width=3,
+               fg="black", text_color="white", start_angle=270, end_angle=-360, text_font="DS-Digital 30", 
+               scale_color="white", axis_color="white",
+               needle_color="snow", border_color="maroon")
+meter2.set_mark(70, 80, "yellow")
+meter2.set_mark(80, 100, "red")
+meter2.set(80)  # set value
+meter2.grid(row=1, column=2, padx=20, pady=30)
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# LABELS
+rpm_label = tk.Label(app, text="{mph}", font=("DS-Digital 30", 72), fg="white", bg="black")
+rpm_label.grid(row=1, column=1)
+
+motor_temp = tk.Label(app, text="Motor: 130°F", font=("Loma", 12), fg="white", bg="black")
+motor_temp.grid(row=2, column=0)
+
+bamocar_temp = tk.Label(app, text="Bamocar: 112°F", font=("Loma", 12), fg="white", bg="black")
+bamocar_temp.grid(row=2, column=1)
+
+battery_temp = tk.Label(app, text="Battery: 80°F", font=("Loma", 12), fg="white", bg="black")
+battery_temp.grid(row=2, column=2)
+
+style = ttk.Style()
+style.theme_use('xpnative')
+style.configure("green.Horizontal.TProgressbar", background='green')
+progress = ttk.Progressbar(app, style="green.Horizontal.TProgressbar", orient="horizontal", length=150, mode="determinate")
+progress.grid(row=0, column=0, columnspan=1, padx=20, pady=30)
+progress.bind("<Button-1>", update_progress)
+
+# voltage_percent = tk.Label(app, text="🗲 75%", font=("Loma", 12), fg="white", bg="black")
+# voltage_percent.grid(row=2, column=3, columnspan=3, padx=0, pady=0)
+
+
+app.bind("<KeyPress>", key_press)
+app.bind("<KeyRelease>", key_release)
+
+app.columnconfigure(0, weight=1, minsize=50)
+app.columnconfigure(1, weight=1, minsize=50)
+app.columnconfigure(2, weight=2, minsize=200)
+app.columnconfigure(3, weight=1, minsize=50)
+
+update_dials()
+update_clock()
+
+app.mainloop()
