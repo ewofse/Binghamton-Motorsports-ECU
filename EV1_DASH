@@ -2,114 +2,161 @@ import tkinter as tk
 from tkinter import ttk
 from tkdial import Meter
 from datetime import datetime
+import can
 
-# Global variable to track whether the spacebar is being pressed
+# Initialize CAN BUS
+can_bus = can.interface.Bus(channel='can0', bustype='socketcan', bitrate=500000)
+
+# Global variables
 accelerating = False
 value_speedometer = 0
 value_rpm = 0
 mph = 0
+SOC = 0
+temperature_motor = 0
+temperature_bamocar = 0
+temperature_battery = 0
+
+# Create Application (Dashboard Window)
+app = tk.Tk()
+app.geometry("800x480") 
+app.configure(bg='black')
+
+# -------------------------------------------------------------------------- FUNCTIONS ----------------------------------------------------------------------------------
+
+# CAN BUS DATA FUNCTION
+def update_data_label():
+    try:
+        # Receive a CAN message
+        msg = can_bus.recv()
+
+        # Extract the 8 bytes from the message
+        data_bytes = msg.data
+
+        # Convert each byte to an integer
+        int_values = [int(byte) for byte in data_bytes]
+
+        # Extract the second byte
+        soc_byte = int_values[1]
+
+        # Update the SOC label
+        SOC_label.config(text=f"{soc_byte} %")
+
+        # Update every 100 milliseconds
+        app.after(100, update_data_label)
+
+    except can.CanError:
+        # Handle any CAN errors
+        SOC_label.config(text="Error receiving CAN data")
+        app.after(1000, update_data_label)
+
+def update_vehicle_data():
+    try:
+        # Receive a CAN message
+        msg = can_bus.recv()
+
+        # Check if the message ID is 201
+        if msg.arbitration_id == 201:
+            # Extract the 4 bytes from the message
+            data_bytes = msg.data[:4]
+
+            # Convert each byte to an integer
+            int_values = [int(byte) for byte in data_bytes]
+
+            # Extract the bytes
+            speed_byte = int_values[0]
+            rpm_byte = int_values[1]
+            motor_temp_byte = int_values[2]
+            bamocar_temp_byte = int_values[3]
+
+            # Update the labels
+            MPH_Label.config(text=f"{speed_byte} km/h")
+            meter1.set(speed_byte)
+            meter2.set(rpm_byte)
+            motor_temp_label.config(text=f"{motor_temp_byte} °C")
+            bamocar_temp_label.config(text=f"{bamocar_temp_byte} °C")
+
+            # Update every 100 milliseconds
+            app.after(100, update_vehicle_data)
+
+    except can.CanError:
+        # Handle any CAN errors
+        MPH_Label.config(text="Error receiving CAN data")
+        motor_temp_label.config(text="Error receiving CAN data")
+        bamocar_temp_label.config(text="Error receiving CAN data")
+        app.after(1000, update_vehicle_data)
 
 def update_progress(event):
     progress['value'] = event.x / progress['length'] * 100
 
-def key_press(event):
-    global accelerating
-    if event.keysym == 'space':
-        accelerating = True
-
-def key_release(event):
-    global accelerating
-    if event.keysym == 'space':
-        accelerating = False
-
-def update_dials():
-    global value_speedometer, value_rpm, mph  # Declare 'value' and 'rpm' as global
-    if accelerating:
-        # Increment the dial values
-        value_speedometer += 1
-        value_rpm += 1
-        mph += 1
-        meter1.set(value_speedometer) 
-        meter2.set(value_rpm)
-    else:
-        value_speedometer -= 1 if value_speedometer > 0 else 0
-        value_rpm -= 1 if value_rpm > 0 else 0
-        mph -= 1 if mph > 0 else 0 
-        meter1.set(value_speedometer) 
-        meter2.set(value_rpm)
-   
-    # Update the RPM label
-    rpm_label.config(text=f"{mph}")
-    
-    # Schedule the next update
-    app.after(10, update_dials)
-
+#  Time Function
 def update_clock():
-    current_time = datetime.now().strftime("%I:%M:%S %p")  # 12-hour format
+    current_time = datetime.now().strftime("%I:%M:%S %p")
     label_time.config(text=current_time)
     app.after(1000, update_clock)
 
-app = tk.Tk()
-app.geometry("800x450")
-app.configure(bg='black')
+# -------------------------------------------------------------------------- LABELS ----------------------------------------------------------------------------------
 
-label_time = tk.Label(app, text="", font=("Loma", 12), fg="white", bg="black")
-label_time.grid(row=0, column=1)
+# Time Label
+label_time = tk.Label(app, font=("Courier", 12), fg="white", bg="black")
+label_time.grid(row=0, column=2)
 
-label_temp = tk.Label(app, text="65°F", font=("Loma", 12), fg="white", bg="black")
-label_temp.grid(row=0, column=2, padx=20)
+# Outside Temp Label
+label_temp = tk.Label(app, text="65°F", font=("Courier", 12), fg="white", bg="black")
+label_temp.grid(row=0, column=3, padx=20)
 
-meter1 = Meter(app, radius=250, start=0, end=120, border_width=3,
-               fg="black", text_color="white", start_angle=270, 
-               end_angle=-270, text_font="DS-Digital 30", 
-               scale_color="white", needle_color="snow", border_color="maroon")
-meter1.set_mark(100, 120)  # set red marking from 140 to 160
+# Odometer 
+odometer = tk.Label(app, text="ODO 000000", font=("Courier", 12), fg="white", bg="black")
+odometer.grid(row=0, column=1)
 
-meter1.grid(row=1, column=0, padx=20, pady=30)
+# Speedometer Meter
+meter1 = Meter(app, radius=250, start=0, end=80, border_width=3, fg="black", text_color="white", start_angle=225, end_angle=-265, scale_color="white", needle_color="snow", border_color="red3", text=" MPH", text_font=("DS-Digital 30", 14))
+meter1.set_mark(60, 80) 
+meter1.grid(row=1, column=1, padx=20, pady=30)
 
-meter2 = Meter(app, radius=250, start=0, end=100, border_width=3,
-               fg="black", text_color="white", start_angle=270, end_angle=-360, text_font="DS-Digital 30", 
-               scale_color="white", axis_color="white",
-               needle_color="snow", border_color="maroon")
-meter2.set_mark(70, 80, "yellow")
-meter2.set_mark(80, 100, "red")
-meter2.set(80)  # set value
-meter2.grid(row=1, column=2, padx=20, pady=30)
+# Tachometer Meter
+meter2 = Meter(app, radius=250, start=0, end=80, border_width=3, fg="black", text_color="white", start_angle=220, end_angle=-260, scale_color="white", axis_color="white", needle_color="snow", border_color="red3", text=" x100 RPM", text_font=("DS-Digital 30", 12))
+meter2.set_mark(60, 70, "yellow")
+meter2.set_mark(70, 80, "red")
+meter2.set(80)
+meter2.grid(row=1, column=3, padx=20, pady=30)
 
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# LABELS
-rpm_label = tk.Label(app, text="{mph}", font=("DS-Digital 30", 72), fg="white", bg="black")
-rpm_label.grid(row=1, column=1)
+# Miles Per Hour Number 
+MPH_Label = tk.Label(app, text="{mph}", font=("DS-Digital 30", 96), fg="white", bg="black")
+MPH_Label.grid(row=1, column=2)
 
-motor_temp = tk.Label(app, text="Motor: 130°F", font=("Loma", 12), fg="white", bg="black")
-motor_temp.grid(row=2, column=0)
+# Temperature CAN Values
+motor_temp = tk.Label(app, text="{temperature_motor}", font=("DS-Digital 30", 28), fg="white", bg="black")
+motor_temp.grid(row=2, column=1)
+bamocar_temp = tk.Label(app, text="{temperature_bamocar}", font=("DS-Digital 30", 28), fg="white", bg="black")
+bamocar_temp.grid(row=2, column=2)
+battery_temp = tk.Label(app, text="{temperature_battery}", font=("DS-Digital 30", 28), fg="white", bg="black")
+battery_temp.grid(row=2, column=3)
 
-bamocar_temp = tk.Label(app, text="Bamocar: 112°F", font=("Loma", 12), fg="white", bg="black")
-bamocar_temp.grid(row=2, column=1)
+# Temperature Labels
+motor_temp_label = tk.Label(app, text="Motor Temp", font=("Courier", 9), fg="white", bg="black")
+motor_temp_label.grid(row=3, column=1)
+bamocar_temp_label = tk.Label(app, text="Bamocar Temp", font=("Courier", 9), fg="white", bg="black")
+bamocar_temp_label.grid(row=3, column=2)
+battery_temp_label = tk.Label(app, text="Battery Temp", font=("Courier", 9), fg="white", bg="black")
+battery_temp_label.grid(row=3, column=3)
 
-battery_temp = tk.Label(app, text="Battery: 80°F", font=("Loma", 12), fg="white", bg="black")
-battery_temp.grid(row=2, column=2)
-
+# Progress Bar & State Of Charge
 style = ttk.Style()
-style.theme_use('xpnative')
 style.configure("green.Horizontal.TProgressbar", background='green')
-progress = ttk.Progressbar(app, style="green.Horizontal.TProgressbar", orient="horizontal", length=150, mode="determinate")
-progress.grid(row=0, column=0, columnspan=1, padx=20, pady=30)
+progress = ttk.Progressbar(app, style="green.Horizontal.TProgressbar", orient="vertical", length=225, mode="determinate")
+progress.grid(row=0, column=0, rowspan=2, padx=20, pady=30)
 progress.bind("<Button-1>", update_progress)
+SOC_label = tk.Label(app, text="{SOC}", font=("DS-Digital 30", 72), fg="white", bg="black")
+SOC_label.grid(row=2, column=1)
 
-# voltage_percent = tk.Label(app, text="🗲 75%", font=("Loma", 12), fg="white", bg="black")
-# voltage_percent.grid(row=2, column=3, columnspan=3, padx=0, pady=0)
-
-
-app.bind("<KeyPress>", key_press)
-app.bind("<KeyRelease>", key_release)
-
+# Configure Column Sizes 
 app.columnconfigure(0, weight=1, minsize=50)
-app.columnconfigure(1, weight=1, minsize=50)
-app.columnconfigure(2, weight=2, minsize=200)
-app.columnconfigure(3, weight=1, minsize=50)
+app.columnconfigure(1, weight=1, minsize=120)
+app.columnconfigure(2, weight=3, minsize=80)
+app.columnconfigure(3, weight=1, minsize=100)
 
-update_dials()
+update_data_label()
 update_clock()
 
 app.mainloop()
