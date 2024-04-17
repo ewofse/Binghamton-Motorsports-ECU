@@ -19,38 +19,48 @@ temperature_battery = 0
 
 # Create Application (Dashboard Window)
 app = tk.Tk()
-app.geometry("800x480") 
+app.geometry("800x480")
 app.configure(bg='black')
 
 # -------------------------------------------------------------------------- FUNCTIONS ----------------------------------------------------------------------------------
 
-# CAN BUS DATA FUNCTION
-def update_data_label():
+# ORION BMS CAN BUS DATA INPUT 
+def UPDATE_ORION_DATA():
     try:
         # Receive a CAN message
         msg = can_bus.recv()
 
-        # Extract the 8 bytes from the message
-        data_bytes = msg.data
+        # Check if message ID is 680
+        if msg.arbitration_id == 680:
+            # Extract the 8 bytes from the message
+            data_bytes = msg.data
 
-        # Convert each byte to an integer
-        int_values = [int(byte) for byte in data_bytes]
+            # Convert each byte to an integer
+            int_values_orion = [int(byte) for byte in data_bytes]
 
-        # Extract the second byte
-        soc_byte = int_values[1]
+            # Extract the second byte
+            soc_byte = int_values_orion[1]
 
-        # Update the SOC label
-        SOC_label.config(text=f"{soc_byte} %")
+            high_temp = int_values_orion[5]
 
-        # Update every 100 milliseconds
-        app.after(100, update_data_label)
+            # Update the State of Charge label & Progress Bar
+            SOC_label.config(text=f"{soc_byte} %")
+
+            progress['value'] = soc_byte
+
+            # Update the Highest Battery Temperature
+            battery_temp.config(text=f"{high_temp} | C")
+
+            # Update every 100 milliseconds
+            app.after(100, UPDATE_ORION_DATA)
 
     except can.CanError:
         # Handle any CAN errors
-        SOC_label.config(text="Error receiving CAN data")
-        app.after(1000, update_data_label)
+        SOC_label.config(text="Error")
+        app.after(1000, UPDATE_ORION_DATA)
 
-def update_vehicle_data():
+# BAMOCAR CAN BUS DATA INPUT
+def UPDATE_BAMO_DATA():
     try:
         # Receive a CAN message
         msg = can_bus.recv()
@@ -61,30 +71,30 @@ def update_vehicle_data():
             data_bytes = msg.data[:4]
 
             # Convert each byte to an integer
-            int_values = [int(byte) for byte in data_bytes]
+            int_values_bamo = [int(byte) for byte in data_bytes]
 
             # Extract the bytes
-            speed_byte = int_values[0]
-            rpm_byte = int_values[1]
-            motor_temp_byte = int_values[2]
-            bamocar_temp_byte = int_values[3]
+            speed_byte = int_values_bamo[0]
+            rpm_byte = int_values_bamo[1]
+            motor_temp_byte = int_values_bamo[2]
+            bamocar_temp_byte = int_values_bamo[3]
 
             # Update the labels
-            MPH_Label.config(text=f"{speed_byte} km/h")
+            MPH_Label.config(text=f"{speed_byte}")
             meter1.set(speed_byte)
             meter2.set(rpm_byte)
-            motor_temp_label.config(text=f"{motor_temp_byte} °C")
-            bamocar_temp_label.config(text=f"{bamocar_temp_byte} °C")
+            motor_temp_label.config(text=f"{motor_temp_byte} | C")
+            bamocar_temp_label.config(text=f"{bamocar_temp_byte} | C")
 
-            # Update every 100 milliseconds
-            app.after(100, update_vehicle_data)
+            # Update every 16 milliseconds
+            app.after(16, UPDATE_BAMO_DATA)
 
     except can.CanError:
         # Handle any CAN errors
-        MPH_Label.config(text="Error receiving CAN data")
-        motor_temp_label.config(text="Error receiving CAN data")
-        bamocar_temp_label.config(text="Error receiving CAN data")
-        app.after(1000, update_vehicle_data)
+        MPH_Label.config(text="Error")
+        motor_temp_label.config(text="Error")
+        bamocar_temp_label.config(text="Error")
+        app.after(1000, UPDATE_BAMO_DATA)
 
 def update_progress(event):
     progress['value'] = event.x / progress['length'] * 100
@@ -102,16 +112,16 @@ label_time = tk.Label(app, font=("Courier", 12), fg="white", bg="black")
 label_time.grid(row=0, column=2)
 
 # Outside Temp Label
-label_temp = tk.Label(app, text="65°F", font=("Courier", 12), fg="white", bg="black")
+label_temp = tk.Label(app, text="65 F", font=("Courier", 12), fg="white", bg="black")
 label_temp.grid(row=0, column=3, padx=20)
 
-# Odometer 
+# Odometer
 odometer = tk.Label(app, text="ODO 000000", font=("Courier", 12), fg="white", bg="black")
 odometer.grid(row=0, column=1)
 
 # Speedometer Meter
 meter1 = Meter(app, radius=250, start=0, end=80, border_width=3, fg="black", text_color="white", start_angle=225, end_angle=-265, scale_color="white", needle_color="snow", border_color="red3", text=" MPH", text_font=("DS-Digital 30", 14))
-meter1.set_mark(60, 80) 
+meter1.set_mark(60, 80)
 meter1.grid(row=1, column=1, padx=20, pady=30)
 
 # Tachometer Meter
@@ -121,16 +131,16 @@ meter2.set_mark(70, 80, "red")
 meter2.set(80)
 meter2.grid(row=1, column=3, padx=20, pady=30)
 
-# Miles Per Hour Number 
-MPH_Label = tk.Label(app, text="{mph}", font=("DS-Digital 30", 96), fg="white", bg="black")
+# Miles Per Hour Number
+MPH_Label = tk.Label(app, text="0", font=("DS-Digital 30", 96), fg="white", bg="black")
 MPH_Label.grid(row=1, column=2)
 
 # Temperature CAN Values
-motor_temp = tk.Label(app, text="{temperature_motor}", font=("DS-Digital 30", 28), fg="white", bg="black")
+motor_temp = tk.Label(app, text="0", font=("DS-Digital 30", 28), fg="white", bg="black")
 motor_temp.grid(row=2, column=1)
-bamocar_temp = tk.Label(app, text="{temperature_bamocar}", font=("DS-Digital 30", 28), fg="white", bg="black")
+bamocar_temp = tk.Label(app, text="0", font=("DS-Digital 30", 28), fg="white", bg="black")
 bamocar_temp.grid(row=2, column=2)
-battery_temp = tk.Label(app, text="{temperature_battery}", font=("DS-Digital 30", 28), fg="white", bg="black")
+battery_temp = tk.Label(app, text="0", font=("DS-Digital 30", 28), fg="white", bg="black")
 battery_temp.grid(row=2, column=3)
 
 # Temperature Labels
@@ -147,16 +157,20 @@ style.configure("green.Horizontal.TProgressbar", background='green')
 progress = ttk.Progressbar(app, style="green.Horizontal.TProgressbar", orient="vertical", length=225, mode="determinate")
 progress.grid(row=0, column=0, rowspan=2, padx=20, pady=30)
 progress.bind("<Button-1>", update_progress)
-SOC_label = tk.Label(app, text="{SOC}", font=("DS-Digital 30", 72), fg="white", bg="black")
-SOC_label.grid(row=2, column=1)
+SOC_label = tk.Label(app, text="{SOC}", font=("DS-Digital 30", 12), fg="white", bg="black")
+SOC_label.grid(row=0, column=0)
 
-# Configure Column Sizes 
+# Configure Column Sizes
 app.columnconfigure(0, weight=1, minsize=50)
 app.columnconfigure(1, weight=1, minsize=120)
 app.columnconfigure(2, weight=3, minsize=80)
 app.columnconfigure(3, weight=1, minsize=100)
 
-update_data_label()
+#app.attributes('-fullscreen', True)
+app.bind('<q>', lambda event: app.quit())
+
+UPDATE_ORION_DATA()
+UPDATE_BAMO_DATA()
 update_clock()
 
 app.mainloop()
