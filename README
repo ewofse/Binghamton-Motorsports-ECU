@@ -1,0 +1,111 @@
+/*----------------------------------------------------------------------------------------------------
+|
+|                                      Binghamton Motorsports
+|                                   Formula SAE Electric Vehicle
+|                                            2023-2024
+|
+|                                               d88b
+|                               _______________|8888|_______________
+|                               |_____________ ,~~~~~~. _____________|
+|           _________         |_____________: mmmmmm :_____________|         _________
+|           / _______ \   ,----|~~~~~~~~~~~,'\ _...._ /`.~~~~~~~~~~~|----,   / _______ \
+|           | /       \ |  |    |       |____|,d~    ~b.|____|       |    |  | /       \ |
+|           ||         |-------------------\-d.-~~~~~~-.b-/-------------------|         ||
+|           ||         | |8888 ....... _,===~/......... \~===._         8888| |         ||
+|           ||         |=========_,===~~======._.=~~=._.======~~===._=========|         ||
+|           ||         | |888===~~ ...... //,, .`~~~~'. .,\\        ~~===888| |         ||
+|           ||        |===================,P'.::::::::.. `?,===================|        ||
+|           ||        |_________________,P'_::----------.._`?,_________________|        ||
+|           `|        |-------------------~~~~~~~~~~~~~~~~~~-------------------|        |'
+|             \_______/                                                        \_______/
+|
+|------------------------------------------------------------------------------------------------------
+|
+| Programmer's Name(s):  Markus Higgins, Jake Lin, Ethan Wofse
+| Program Name:      ECU Master Program
+| Date:              Last Updated: 05/07/2024
+|
+|------------------------------------------------------------------------------------------------------
+| Acronyms:
+|     SAE : Society of Automotive Engineers
+|     HV  : High Voltage, this system when fully charged is 400V
+|     AIR : Accumulator Isolation Relay, there are +/- relays which control HV to the Motor Controller
+|     RTD : Ready to Drive
+|     ECU : Electronic Control Unit
+|     PCB : Printed Circuit Board
+|     CAN : Controller Area Network, a robust method of communication used widely in automotives
+|     DLC : Data Length Code, a parameter in the CAN frame that defines how many data bytes to expect
+|     APPS: Accelerator Pedal Position Sensor, hall effect
+|     BSE : Brake System Encoder, hall effect
+|     OOR : Out of Range, pedal travel is defined as in range from 0.5V to 4.5V
+|
+|------------------------------------------------------------------------------------------------------
+| Theory of Operation:
+|     This is the main program run by the vehicles central Electronic Control Unit (ECU), a Teensy 4.1. 
+|
+|     It can be broken down into 6 States:
+|       1. Init
+|       2. Precharge
+|       2. Wait_For_RTD
+|       3. Idle
+|       4. Drive
+|       5. Brake (In Development)
+|       6. Fault
+|
+|           Precharge is designed to first check for the activation of the tractive (High Voltage) 
+|     system through the status of the shutdown circuit output to AIR- and the Precharge Relay. 
+|     The shutdown circuit is a series of switches that, when closed, provide 12V to AIR coils. Once
+|     high, the tractive system is active and the susbsequently precharging, at which point after 500ms
+|     of charging the ECU biases AIR+ shut. At this point, the tractive system is fully energized and
+|     ready to drive the motor, while the discharge relay becomes inverted with respect to the 
+|     shutdown circuit signal. 
+|
+|           RTD Driver Input is designed to wait for a signal from the driver to put the vehicle into
+|     it's drive state. Specifically, the driver must step on the brake pedal and then press the Ready
+|     to drive button in the cockpit. 
+|
+|           The vehicle will remain in Idle once it is ready to drive and the operator is not requesting
+|     acceleration. The long term goal of this state is to incorporate power saving features here
+|
+|           Drive will continually process pedal signals from the driver and broadcast the percent 
+|     request over the CANBus to the motor controller. Drive executes important safety checks such as 
+|     the accelerator pedal redundancy check. (**Still in development**)
+|
+|           Upon any non-zero percent request for braking, the vehicle will enter the brake state.
+|     A CAN message will be sent to the Motor Controller to set its speed register to 0. In the future,
+|     this state will incorporate regenerative braking. 
+|
+|           The vehicle will remain in the fault state until it is rekeyed. Error code CAN messages will
+|     continue to be sent outside of the switch-case statement along with ...
+|
+|
+|------------------------------------------------------------------------------------------------------
+| Inputs:
+|           The ECU recieves inputs from the shutdown circuit tap, RTD button, accelerator pedal 1, 
+|     accelerator pedal 2, and the brake pedal. These 5V and 12V (max) signals are fed through voltage  
+|     dividers so that 3.3V is seen at the pins of the Teensy. 
+|
+|     ***We need to include the supply voltages to each pedal and process these via the GPIO pins on the
+|     ECU PCB so that we can normalize the output signal voltages to their respective supply***
+|   
+|------------------------------------------------------------------------------------------------------
+| Processing:
+|           The majority of data processing is done to the 3 analog pedal input signals. Analog pedal
+|     data must be averaged, APPS1 and APPS2 must be compared for redundancy, and then the outputs are 
+|     (averaged?) and scaled to 16 bits from the 10 bit size assigned to digital read inputs.
+|
+|------------------------------------------------------------------------------------------------------
+| Outputs:
+|           The ECU outputs drive MOSFETS that control the AIR+, discharge relay, RTD sound, brake
+|     light, RUN signal and GO signal. In addition, the ECU outputs CAN data to the CANBus, with an
+|     optional 120Ohm terminating resistor on the PCB. 
+|
+|------------------------------------------------------------------------------------------------------
+| Associated Rules:
+|     - EV. 5.6   (Precharge)
+|     - EV. 9.1   (Activation Sequence)
+|     - EV. 9.4.2 (RTD Conditions)
+|     - T. 4.2    (APPS)
+|
+|
+|----------------------------------------------------------------------------------------------------*/
