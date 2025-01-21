@@ -23,7 +23,7 @@
 |
 | Programmer's Name(s):  Markus Higgins, Jake Lin, Ethan Wofse
 | Program Name:      ECU Master Program
-| Date:              Last Updated: 05/07/2024
+| Date:              Last Updated: 09/21/2024
 |
 |------------------------------------------------------------------------------------------------------
 | Acronyms:
@@ -107,5 +107,10 @@
 |     - EV. 9.4.2 (RTD Conditions)
 |     - T. 4.2    (APPS)
 |
+|
+|----------------------------------------------------------------------------------------------------*/
+| To program the Teensy 4.1 on your local machine, change the lib_extra_dirs file path to your local
+| file path where the Include folder is. Then open the PlatformI/O project for either the ECU or
+| pedal calibration project. From there, you can build and upload your program to the controller.
 |
 |----------------------------------------------------------------------------------------------------*/

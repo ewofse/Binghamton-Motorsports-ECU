@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "*.c": "c",
+        "bit": "cpp",
+        "compare": "cpp",
+        "cstddef": "cpp",
+        "string": "cpp",
+        "limits": "cpp",
+        "memory": "cpp",
+        "new": "cpp",
+        "functional": "cpp",
+        "*.tpp": "cpp",
+        "array": "cpp",
+        "string_view": "cpp"
+    }
+}
