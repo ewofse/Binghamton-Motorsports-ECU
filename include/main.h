@@ -1,14 +1,22 @@
 // Safe guards
-#ifndef ECU_H
-#define ECU_H
+#ifndef MAIN_H
+#define MAIN_H
 
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
+#include <FlexCAN_T4.h>
+#include <Watchdog_T4.h>
+
+#include <Arduino.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <FlexCAN_T4.h>
-#include <Arduino.h>
+#include <string.h>
+#include <SPI.h>
+#include <SD.h>
+
+#include "hall.h"
+#include "ISR.h"
 
 /*-------------------------------------------------------------------------------------------------
  Initializations for CAN Communication
@@ -18,28 +26,48 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 /*------------------------------------------
  Macros - Pins
 ------------------------------------------*/
-#define PIN_BRAKE            A11 // Left
-#define PIN_RTD_BUTTON       28  // Second Left
-#define PIN_ACCELERATOR_ONE  A13 // Second Right
-#define PIN_ACCELERATOR_TWO  A12 // Right
-#define PIN_SHUTDOWN_TAP     12
+// #define EV1
+#define EV1_5
 
-#define PIN_RESET            18
-#define PIN_RTD_SOUND        20
-#define PIN_RUN              21
-#define PIN_GO               22
-#define PIN_BRAKE_LIGHT      19
-#define PIN_DISCHARGE        40
-#define PIN_AIR_PLUS         41
+#ifdef EV1_5
+    #define PIN_BSE              A16
+    #define PIN_APPS_ONE         A15
+    #define PIN_APPS_TWO         A14 
 
-#define PIN_GPIO0            0
-#define PIN_GPIO1            1
-#define PIN_GPIO2            2
-#define PIN_GPIO3            3
-#define PIN_GPIO4            4
-#define PIN_GPIO5            5
-#define PIN_GPIO6            6
-#define PIN_GPIO7            7
+    #define PIN_RTD_BUTTON       9
+    #define PIN_SHUTDOWN_TAP     8
+    #define PIN_RESET            35
+    #define PIN_RUN              13
+    #define PIN_GO               17
+    #define PIN_BRAKE_LIGHT      33
+    #define PIN_LED_FAULT        13
+    #define PIN_REGEN            14
+    #define PIN_CHARGE_ENABLE    11
+#elif defined(EV1)
+    #define PIN_BSE              A10 // Left
+    #define PIN_APPS_ONE         A13 // Second Right
+    #define PIN_APPS_TWO         A12 // Right
+
+    #define PIN_RTD_BUTTON       25  // Second Left
+    #define PIN_SHUTDOWN_TAP     12
+    #define PIN_RESET            18
+    #define PIN_RUN              21
+    #define PIN_GO               22
+    #define PIN_BRAKE_LIGHT      19
+    #define PIN_AIR_PLUS         41
+#endif
+
+#define PIN_RTD_SOUND            20
+#define PIN_GPIO0                0
+#define PIN_GPIO1                1
+#define PIN_GPIO2                2
+#define PIN_GPIO3                3
+#define PIN_GPIO4                4
+#define PIN_GPIO5                5
+#define PIN_GPIO6                6
+#define PIN_GPIO7                7
+#define PIN_LED                  13
+// #define PIN_VREF
 
 /*------------------------------------------
  Macros - Baud & Serial Rates
@@ -54,8 +82,8 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 #define PAR_REMOTE           0
 #define PAR_OVERRUN          0
 #define PAR_RESERVED         0
-#define PAR_SEND_DLC         3
-#define PAR_RECEIVE_DLC      4
+#define PAR_RX_DLC           3
+#define PAR_TX_DLC           4
 
 /*------------------------------------------
  Macros - Bamocar CAN Message IDs
@@ -69,11 +97,27 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 #define REG_DIG_SPEED_SET    0x31
 #define REG_DIG_TORQUE_SET   0x90
 #define REG_SPEED_ACTUAL     0x30 
-#define REG_MOTOR_TEMP       0x49
+#define REG_TEMP             0x49
 #define REG_READ             0x3D
 #define REG_RPM              0xA8
 #define REG_VOLTAGE          0x8A
 #define REG_CURRENT          0x5F
+#define REG_CURRENT_PHASE_1  0x54
+#define REG_CURRENT_PHASE_2  0x55
+#define REG_CURRENT_PHASE_3  0x56
+#define TRANSMIT_ONCE        0x00
+
+/*------------------------------------------
+ Macros - Custom CAN protocol
+------------------------------------------*/
+#define ID_ERROR_CODE        0x681
+#define ID_CURRENT_STATE     0x682
+#define ID_TEMP              0x001
+#define ID_SPEED             0x002
+#define ID_CURRENT           0x003
+#define ID_VOLTAGE           0x004
+#define PAR_ERROR_DLC        1
+#define PAR_STATE_DLC        1
 
 /*------------------------------------------
  Macros - Bit Manipulation
@@ -85,114 +129,57 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 #define TEN_BITS             1023
 
 /*------------------------------------------
- Macros - Hall Effect Sensors
+ Macros - Timing
 ------------------------------------------*/
-#define MAX                  0
-#define MIN                  1
-#define VOLTAGE              0
-#define PERCENT_REQ          1
-#define BSPD_CHECK           5
-#define PERCENT_BRAKE        10
-#define PERCENT_ACCEL        25
-#define PERCENT_THRESHOLD    5
-#define APPS_AGREEMENT       10
+#define IMPLAUSIBILITY_TIME  100
+#define CHARGE_TIME          500  
+#define BUZZER_TIME          1000
+#define RESET_TIME           1000
+#define DISCHARGE_TIME       1500
 
 /*------------------------------------------
- Macros - Custom CAN protocol
+ Macros - Files
 ------------------------------------------*/
-#define ID_ERROR_CODE        0x681
-#define ID_CURRENT_STATE     0x682
-#define ID_MOTOR_TEMP        0x001
-#define ID_RPM               0x002
-#define ID_CURRENT           0x003
-#define ID_VOLTAGE           0x004
-#define PAR_ERROR_DLC        1
-#define PAR_STATE_DLC        1
+#define OVERWRITE            1
+#define FILE_PEDAL_BOUNDS    "pedal_bounds.csv"
+#define FILE_CURRENT_DRAW    "current_draw.csv"
 
 /*------------------------------------------
  Macros - Other
 ------------------------------------------*/
-#define ARRAY_SIZE           40
-#define DELAY                500
-#define RESET                1000
+#define DELIMITER            ','
+#define ADC_RESOLUTION       TEN_BITS
+#define ERROR_CODE_SHUTDOWN  0
+#define ERROR_CODE_DISAGREE  1
+#define ERROR_CODE_APPS_BSE  2
+#define ERROR_CODE_OOR       3
+
+/*------------------------------------------
+ Macros - Debugging
+------------------------------------------*/
+#define EXIT while (1) {}
+#define DEBUG
+
+#ifdef DEBUG
+    #define DebugBegin(baudRate)     Serial.begin(baudRate)
+    #define DebugPrint(message)      Serial.print(message)
+    #define DebugPrintln(message)    Serial.println(message)
+    #define DebugPrintHEX(message)   Serial.println(message, HEX)
+    #define DebugErrorPrint(message) { for (int i = 0; i < 100; ++i) DebugPrintln(message); }
+#else
+    // Empty defines cause all prints to be ignored during acutal operation
+    #define DebugBegin(baudRate)
+    #define DebugPrint(message)
+    #define DebugPrintln(message)
+    #define DebugPrintHEX(message)
+    #define DebugErrorPrint(message)
+#endif
 
 /*-------------------------------------------------------------------------------------------------
- Hall Effect Processing
--------------------------------------------------------------------------------------------------*/
-const uint16_t hallAPPS1[][2] {
-    /* Cooked Value */  /* Percent Request */
-    /*-------------------------------------*/
-    {      51500      ,          100        },
-    {      41000      ,            0        }
-};
-
-const uint16_t hallAPPS2[][2] {
-    /* Cooked Value */  /* Percent Request */
-    /*-------------------------------------*/
-    {      27500      ,          100        },
-    {      7200       ,            0        }
-};
-
-const uint16_t hallBSE[][2] {
-    /* Cooked Value */  /* Percent Request */
-    /*-------------------------------------*/
-    {      33700      ,          100        },
-    {      26000      ,            0        }
-};
-
-/*
-    Implement soon: the percent request arrays should be a function of the supply voltage to the teensy as the battery
-    drains over time.
-*/
-
-class hall {    
-    public:
-        // Constructor
-        hall(const uint8_t pin);
-
-        // Getters
-        uint16_t GetTotal() { return total; }
-        uint8_t GetCounter() { return counter; }
-        uint16_t GetArrayValue(int index) { return array[index]; }
-
-        uint16_t GetRawSupply() { return rawSupply; }
-        uint16_t GetRawOutput() { return rawOutput; }
-        uint16_t GetCookedOutput() { return cookedOutput; }
-        uint16_t GetTorqueRequest() { return torqueRequest; }
-
-        // Setters
-        void ModifyTotal(int value) { total += value; }
-        void SetCounter(int value) { counter = value; }
-        void SetArrayValue(int index, int value) { array[index] = value; }
-
-        void SetRawOutput(uint16_t value) { rawOutput = value; }
-        void SetCookedOutput(uint16_t value) { cookedOutput = value; }
-        void SetTorqueRequest(uint16_t value) { torqueRequest = value; }
-
-        // Data methods
-        float GetPercentRequest(const uint16_t sensor[][2]);
-        uint16_t ReadPedal();
-        void InitializeArray(uint16_t * pArray, const int size);
-    
-    private:
-        // Used for averaging the raw hall effect output signal
-        int16_t total;
-        uint8_t counter;
-        uint16_t array[ARRAY_SIZE];
-
-        // Pedal supply, signal, and processed signal data
-        uint16_t rawSupply;
-        uint16_t rawOutput;
-        uint16_t cookedOutput;
-        uint16_t torqueRequest;
-
-        uint8_t pin;
-};
-
-/*-------------------------------------------------------------------------------------------------
- States
+ States / Data Structures
 -------------------------------------------------------------------------------------------------*/
 typedef enum state {
+    PEDALS,
     INIT,
     PRECHARGE,
     WAIT_FOR_RTD,
@@ -202,12 +189,33 @@ typedef enum state {
     FAULT
 } state_t;
 
+typedef enum calibrate {
+    PERCENT_REQ_LOWER,
+    PERECENT_REQ_UPPER,
+    DONE
+} calibrate_t;
+
+typedef struct timers {
+    elapsedMillis chargeTimer;
+    elapsedMillis buzzerTimer;
+    elapsedMillis pedalErrorTimer;
+    bool bChargeTimerStarted;
+    bool bBuzzerActive;
+    bool b100msPassed;
+} timers_t;
+
 /*-------------------------------------------------------------------------------------------------
  Prototypes
 -------------------------------------------------------------------------------------------------*/
 void SetPinModes();
 
-bool ReadyToDrive(bool * bReady, hall * pBSE);
+void ConfigureCANBus();
+
+bool ButtonDebouncer(uint8_t pin);
+
+bool ButtonPulser(bool signal);
+
+bool ReadyToDrive(hall * pBSE);
 
 void ActivateBrakeLight(hall * pBSE);
 
@@ -215,33 +223,26 @@ void ActivateBamocar();
 
 void DeactivateBamocar();
 
-void DischargeHighVoltage();
+void ActivateFaultLED();
 
-void AverageSignal(hall * pAPPS, const uint16_t sensor[][2]);
+void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, 
+    uint8_t * pMessageBuf, uint8_t bamocarDestReg);
+void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint8_t bamocarDestReg);
+void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint8_t * pMessageBuf);
 
-void ProcessAPPS(hall * pAPPS1, hall * pAPPS2, int8_t * pSpeedBuf);
-
-void UpdatePedalStructures(hall * APPS1, hall * APPS2, hall * BSE);
-
-float GetLowerPercentAPPS(hall * pAPPS1, hall * pAPPS2);
-
-bool CheckAPPS(hall * APPS1, hall * APPS2);
-
-bool CheckPedalsOOR(hall * pAPPS1, hall * pAPPS2, hall * pBSE);
-
-bool AccelAndBrakePressed(hall * pAPPS1, hall * pAPPS2, hall * pBSE);
-
-bool CheckAllErrors(hall * pAPPS1, hall * pAPPS2, hall * pBSE, int8_t * errorBuf, bool b100msPassed, int8_t * tempCode);
-
-void PopulateCANMessage(CAN_message_t * pMessage, uint8_t DLC, uint8_t bamocarDestReg, int8_t messageBuf[], uint16_t ID);
-
-void PopulatePiCANMessage(CAN_message_t * pMessage, uint8_t DLC, int8_t * messageBuf, uint16_t ID);
+bool MapCANMessage(CAN_message_t * pMessage1, CAN_message_t * pMessage2);
 
 void SendCANMessage(CAN_message_t * pMessage);
 
 void ReadCANMessage(CAN_message_t * pMessage);
 
-void PrintDebugMessage(const char message[]);
+void SendVehicleState(uint8_t state);
+
+uint16_t * SplitIntegerString(String strValue, const char delimiter);
+
+void WriteDataToFile(const char * strFileName, const String & strData, bool overwrite);
+
+void UpdateCurrentData(CAN_message_t * pMessage, String & strData, uint16_t pDataBuf[]);
 
 // End safe guards
-#endif /* ECU_H */
+#endif /* MAIN_H */
