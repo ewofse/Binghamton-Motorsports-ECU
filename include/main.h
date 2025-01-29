@@ -1,4 +1,4 @@
-// Safe guards
+  // Safe guards
 #ifndef MAIN_H
 #define MAIN_H
 
@@ -6,7 +6,7 @@
  Libraries
 -------------------------------------------------------------------------------------------------*/
 #include <FlexCAN_T4.h>
-#include <Watchdog_T4.h>
+#include <Watchdog_t4.h>
 
 #include <Arduino.h>
 #include <stdint.h>
@@ -26,8 +26,8 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 /*------------------------------------------
  Macros - Pins
 ------------------------------------------*/
-// #define EV1
-#define EV1_5
+#define EV1
+// #define EV1_5
 
 #ifdef EV1_5
     #define PIN_BSE              A16
@@ -119,6 +119,20 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 #define PAR_ERROR_DLC        1
 #define PAR_STATE_DLC        1
 
+#define NUM_TX_MAILBOXES     10
+#define NUM_RX_MAILBOXES	 6 // FlexCAN FIFO queue holds 6
+#define NUM_MAILBOXES        NUM_TX_MAILBOXES + NUM_RX_MAILBOXES
+#define MAILBOX_TORQUE		 MB6
+#define MAILBOX_FAULT		 MB7
+#define MAILBOX_STATE		 MB8
+#define MAILBOX_TEMP		 MB9
+#define MAILBOX_SPEED		 MB10
+#define MAILBOX_CURRENT		 MB11
+#define MAILBOX_VOLTAGE		 MB12
+#define MAILBOX_PHASE_ONE	 MB13
+#define MAILBOX_PHASE_TWO	 MB14
+#define MAILBOX_PHASE_THREE	 MB15
+
 /*------------------------------------------
  Macros - Bit Manipulation
 ------------------------------------------*/
@@ -134,7 +148,7 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 #define IMPLAUSIBILITY_TIME  100
 #define CHARGE_TIME          500  
 #define BUZZER_TIME          1000
-#define RESET_TIME           1000
+#define RESET_TIME           5000
 #define DISCHARGE_TIME       1500
 
 /*------------------------------------------
@@ -153,6 +167,8 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 #define ERROR_CODE_DISAGREE  1
 #define ERROR_CODE_APPS_BSE  2
 #define ERROR_CODE_OOR       3
+#define MESSAGE_INTERVAL	 10
+#define NUM_MESSAGES_TX		 6
 
 /*------------------------------------------
  Macros - Debugging
@@ -164,7 +180,7 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
     #define DebugBegin(baudRate)     Serial.begin(baudRate)
     #define DebugPrint(message)      Serial.print(message)
     #define DebugPrintln(message)    Serial.println(message)
-    #define DebugPrintHEX(message)   Serial.println(message, HEX)
+    #define DebugPrintHEX(message)   Serial.print(message, HEX)
     #define DebugErrorPrint(message) { for (int i = 0; i < 100; ++i) DebugPrintln(message); }
 #else
     // Empty defines cause all prints to be ignored during acutal operation
@@ -173,6 +189,29 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
     #define DebugPrintln(message)
     #define DebugPrintHEX(message)
     #define DebugErrorPrint(message)
+#endif
+
+/*------------------------------------------
+ Macros - Vehicle-Specific Functions
+------------------------------------------*/
+#ifdef EV1
+	#define EV1_AIR_PLUS_HIGH() digitalWrite(PIN_AIR_PLUS, HIGH);
+#else
+	#define EV1_AIR_PLUS_HIGH()
+#endif
+
+#ifdef EV1_5
+	#define EV1_5_TOGGLE_FAULT_LED() digitalWrite( PIN_LED_FAULT, !digitalRead(PIN_LED_FAULT) );
+	#define EV1_5_ACTIVATE_FAULT_LED() ActivateFaultLED();
+    #define EV1_5_SET_PIN_MODES() {
+        pinMode(PIN_REGEN,           INPUT);
+		pinMode(PIN_LED_FAULT,       OUTPUT);
+		pinMode(PIN_CHARGE_ENABLE,   OUTPUT);
+    }
+#else
+	#define EV1_5_TOGGLE_FAULT_LED()
+	#define EV1_5_ACTIVATE_FAULT_LED()
+    #define EV1_5_SET_PIN_MODES()
 #endif
 
 /*-------------------------------------------------------------------------------------------------
@@ -199,9 +238,11 @@ typedef struct timers {
     elapsedMillis chargeTimer;
     elapsedMillis buzzerTimer;
     elapsedMillis pedalErrorTimer;
+    elapsedMillis resetTimer;
     bool bChargeTimerStarted;
     bool bBuzzerActive;
     bool b100msPassed;
+    bool bResetTimerStarted;
 } timers_t;
 
 /*-------------------------------------------------------------------------------------------------
@@ -230,19 +271,18 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC,
 void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint8_t bamocarDestReg);
 void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint8_t * pMessageBuf);
 
-bool MapCANMessage(CAN_message_t * pMessage1, CAN_message_t * pMessage2);
+bool MapCANMessage(uint8_t REGID, CAN_message_t &message);
 
-void SendCANMessage(CAN_message_t * pMessage);
+void SendCANMessage(const CAN_message_t &message);
+void SendCANMessage(const CAN_message_t &message, const FLEXCAN_MAILBOX MB);
 
-void ReadCANMessage(CAN_message_t * pMessage);
-
-void SendVehicleState(uint8_t state);
+void SendCANMessagePeriodic(CAN_message_t * pMessages, FLEXCAN_MAILBOX * pMB);
 
 uint16_t * SplitIntegerString(String strValue, const char delimiter);
 
-void WriteDataToFile(const char * strFileName, const String & strData, bool overwrite);
+void WriteDataToFile(const char * strFileName, const String &strData, bool overwrite);
 
-void UpdateCurrentData(CAN_message_t * pMessage, String & strData, uint16_t pDataBuf[]);
+bool UpdateCurrentData(CAN_message_t * pMessage, String &strData, uint16_t pDataBuf[]);
 
 // End safe guards
 #endif /* MAIN_H */

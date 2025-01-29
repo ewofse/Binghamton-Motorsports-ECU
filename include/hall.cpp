@@ -233,7 +233,7 @@ bool CheckPedalImplausibility(hall * pAPPS1, hall * pAPPS2, hall * pBSE, elapsed
             *pPedalErrorTimer = 0;
             bPedalError = true;
         } else if (*pPedalErrorTimer > IMPLAUSIBILITY_TIME) {
-            DebugPrint("PEDAL ERROR TIMER: "); DebugPrintln(*pPedalErrorTimer);
+            // DebugPrint("PEDAL ERROR TIMER: "); DebugPrintln(*pPedalErrorTimer);
 
             bResult = true;
             bPedalError = false;

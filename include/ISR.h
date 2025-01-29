@@ -19,6 +19,8 @@ extern WDT_T4<WDT1> WDT;
 /*-------------------------------------------------------------------------------------------------
  Prototypes for Interrupt Service Routines (ISRs)
 -------------------------------------------------------------------------------------------------*/
+void ProcessCANMessage(const CAN_message_t &message);
+
 void ShutdownCircuitISR();
 
 void CallbackWDT();

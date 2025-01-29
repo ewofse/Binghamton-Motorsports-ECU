@@ -21,63 +21,74 @@ void SetPinModes() {
 	pinMode(PIN_LED,             OUTPUT);
 
 	// EV1.5 additional Teensy pins
-	#ifdef EV1_5
-		pinMode(PIN_REGEN,           INPUT);
-		pinMode(PIN_LED_FAULT,       OUTPUT);
-		pinMode(PIN_CHARGE_ENABLE,   OUTPUT);
-	#endif
+	EV1_5_SET_PIN_MODES();
 }
 
 /*-----------------------------------------------------------------------------
- Configure CAN bus baud rate and message FIFO and filters
+ Configure the CAN bus network
 -----------------------------------------------------------------------------*/
 void ConfigureCANBus() {
+	// Enable CAN bus
 	myCan.begin();
 	myCan.setBaudRate(BAUD_RATE);
-	myCan.enableFIFO();
 
-	// Set message filters for reading
+	// Setup interrupts to receive messages in a queue
+	myCan.setMaxMB(NUM_MAILBOXES);
+
+	// Declare mailboxes for transmitting
+	for (int i = NUM_RX_MAILBOXES; i < NUM_TX_MAILBOXES + NUM_RX_MAILBOXES; ++i) {
+		myCan.setMB( (FLEXCAN_MAILBOX)i, TX, STD );
+	}
+
+	// Setup FIFO and message processing with interrupts
+	myCan.enableFIFO();
+	myCan.enableFIFOInterrupt();
 	myCan.setFIFOFilter(REJECT_ALL);
 	myCan.setFIFOFilter(0, ID_CAN_MESSAGE_TX, STD);
+	myCan.onReceive(FIFO, ProcessCANMessage);
 }
 
 /*-----------------------------------------------------------------------------
  Switch debouncer that elimates bouncing periods of 5ms
 -----------------------------------------------------------------------------*/
 bool ButtonDebouncer(uint8_t pin) {
-	// The timer here acts as a counter to count 5ms
-	static elapsedMillis timer = 0;
+    const uint8_t debounceTime = 5;
+    static elapsedMillis timer = 0;
+    static uint8_t lastStableState = LOW;
+    static uint8_t lastReading = LOW;
 
-	// State register
-	static bool state[2] = {LOW, LOW};
-	const uint32_t debounceTime = 5;
+    // Read the current pin state
+    uint8_t currentReading = digitalRead(pin);
 
-	// Reset the timer when there is a change in input
-	if ( state[0] != state[1] ) {
-		timer = 0;
-	}
+    // Reset the timer if the input changes
+    if (currentReading != lastReading) {
+        timer = 0;
+    }
 
-	// Save the current and past signal values in the state register
-	state[0] = state[1];
-	state[1] = digitalRead(pin);
+    // Update the last raw reading
+    lastReading = currentReading;
 
-	// Counter is enabling the DFF every 5ms
-	return (timer >= debounceTime) ? state[1] : state[0];
+    // Update stable state when debounce time elapses
+    if (timer >= debounceTime) {
+        lastStableState = currentReading;
+    }
+
+    return lastStableState;
 }
 
 /*-----------------------------------------------------------------------------
  Rising edge pulser for buttons
 -----------------------------------------------------------------------------*/
 bool ButtonPulser(bool signal) {
-	// State register
-	static bool state[2] = {LOW, LOW};
+    static uint8_t previousState = LOW;
 
-	// On the next "rising clock edge" shift outputs in (FIFO)
-	state[0] = state[1];
-	state[1] = signal;
+    // Output is rising edge detection
+    bool pulse = signal && !previousState;
 
-	// Q1 AND NOT Q0
-	return state[1] & !state[0];
+    // Update the previous state
+    previousState = signal;
+
+    return pulse;
 }
 
 /*-----------------------------------------------------------------------------
@@ -122,17 +133,15 @@ void DeactivateBamocar() {
 /*-----------------------------------------------------------------------------
  Blinking fault indicator LED on ECU PCB
 -----------------------------------------------------------------------------*/
-#ifdef EV1_5
-	void ActivateFaultLED() {
-		static uint32_t blinked = millis();
+void ActivateFaultLED() {
+	static uint32_t blinked = millis();
 
-		// Toggle LED every 100 milliseconds
-		if ( millis() - blinked > 100 ) {
-			blinked = millis();
-			digitalWrite( PIN_LED_FAULT, !digitalRead(PIN_LED_FAULT) );
-		}
+	// Toggle LED every 100 milliseconds
+	if ( millis() - blinked > 100 ) {
+		blinked = millis();
+		EV1_5_TOGGLE_FAULT_LED();
 	}
-#endif
+}
 
 /*-----------------------------------------------------------------------------
  Populate CAN message frame (Bamocar write specific)
@@ -196,39 +205,31 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint
 /*-----------------------------------------------------------------------------
  Map a CAN message's ID, DLC, and data to another message
 -----------------------------------------------------------------------------*/
-bool MapCANMessage(CAN_message_t * pMessage1, CAN_message_t * pMessage2) {
+bool MapCANMessage(uint8_t REGID, CAN_message_t &message) {
 	bool bMapped = true;
 
-	switch (pMessage1->buf[0]) {
+	// Match first byte of Bamocar message buffer to ID of Raspberry Pi message
+	switch (REGID) {
 		case (REG_TEMP):
-			pMessage2->id = ID_TEMP;
+			message.id = ID_TEMP;
 			break;
 
 		case (REG_CURRENT):
-			pMessage2->id = ID_CURRENT;
+			message.id = ID_CURRENT;
 			break;
 
 		case (REG_VOLTAGE):
-			pMessage2->id = ID_VOLTAGE;
+			message.id = ID_VOLTAGE;
 			break;
 
 		case (REG_SPEED_ACTUAL):
-			pMessage2->id = ID_SPEED;
+			message.id = ID_SPEED;
 			break;
 
 		default:
-			pMessage2->id = pMessage1->id;
 			bMapped = false;
-
 			// DebugPrintln("NO ID MATCH");
 			break;
-	}
-
-	pMessage2->len = pMessage1->len;
-	
-	// Populate buffer for message
-	for (int i = 0; i < pMessage2->len; ++i) {
-		pMessage2->buf[i] = pMessage1->buf[i];
 	}
 
 	// Return true when the ID has been re-mapped
@@ -236,45 +237,49 @@ bool MapCANMessage(CAN_message_t * pMessage1, CAN_message_t * pMessage2) {
 }
 
 /*-----------------------------------------------------------------------------
- Send CAN Message
+ Send a CAN message (to any transmitting mailbox)
 -----------------------------------------------------------------------------*/
-void SendCANMessage(CAN_message_t * pMessage) {
-	myCan.write(*pMessage);
+void SendCANMessage(const CAN_message_t &message) {
+	static uint8_t cnt = 0;
+	myCan.write(message);
+	++cnt;
+	DebugPrintln(cnt);
+	// DebugPrintln("MESSAGE SENT");
+}
+
+/*-----------------------------------------------------------------------------
+ Send a CAN message to a specified transmitting mailbox
+-----------------------------------------------------------------------------*/
+void SendCANMessage(const CAN_message_t &message, const FLEXCAN_MAILBOX MB) {
+	static uint8_t cnt = 0;
+	myCan.write(MB, message);
+	++cnt;
 	DebugPrintln("MESSAGE SENT");
+	DebugPrintln(cnt);
 }
 
 /*-----------------------------------------------------------------------------
- Read CAN message
+ Periodically send less critical CAN messages (every 10ms)
 -----------------------------------------------------------------------------*/
-void ReadCANMessage(CAN_message_t * pMessage) {
-	// Attempt to read a message
-	if ( myCan.read(*pMessage) ) {
-		// Print the message ID and DLC
-		DebugPrint("ID: 0x"); DebugPrintHEX( (*pMessage).id );
-		DebugPrint(" LEN: "); DebugPrint( (*pMessage).len );
-		DebugPrint(" DATA: ");
+void SendCANMessagePeriodic(CAN_message_t * pMessages, FLEXCAN_MAILBOX * pMailboxes) {
+	static uint32_t time = millis();
+	static uint8_t messageIndex = 0;
+	static uint8_t mailboxIndex = 0;
 
-		// Print the message data buffer
-		for (int i = 0; i < pMessage->len; ++i) {
-			DebugPrintHEX(pMessage->buf[i]);
-			DebugPrint(" ");
-		}
+	// Check if 10ms has psased
+	if ( millis() - time > MESSAGE_INTERVAL ) {
+		// Reset timer
+		time = millis();
 
-		// Print the message timestamp
-		DebugPrint("  TS: "); DebugPrintln( (*pMessage).timestamp );
-		DebugPrintln("");
+		// Send the message
+		SendCANMessage(pMessages[messageIndex], pMailboxes[mailboxIndex]);
+
+		// Increment pointers and wrap around if necessary
+		++messageIndex;
+		++mailboxIndex;
+		messageIndex %= NUM_MESSAGES_TX;
+		mailboxIndex %= NUM_MESSAGES_TX;
 	}
-}
-
-/*-----------------------------------------------------------------------------
- Send CAN message of current state to dashboard
------------------------------------------------------------------------------*/
-void SendVehicleState(uint8_t state) {
-	CAN_message_t msgCurrentState;
-
-	// Apply correct ID and state value and send to dashboard
-	PopulateCANMessage(&msgCurrentState, ID_CURRENT_STATE, PAR_STATE_DLC, &state);
-	SendCANMessage(&msgCurrentState);
 }
 
 /*-----------------------------------------------------------------------------
@@ -319,7 +324,7 @@ uint16_t * SplitIntegerString(String strValue, const char delimiter) {
 /*-----------------------------------------------------------------------------
  Write a string of data to a data file
 -----------------------------------------------------------------------------*/
-void WriteDataToFile(const char * strFileName, const String & strData, bool overwrite) {
+void WriteDataToFile(const char * strFileName, const String &strData, bool overwrite) {
 	File fData;
 	
 	// Delete old data to overwrite file
@@ -348,7 +353,8 @@ void WriteDataToFile(const char * strFileName, const String & strData, bool over
 /*-----------------------------------------------------------------------------
  Store each phase current
 -----------------------------------------------------------------------------*/
-void UpdateCurrentData(CAN_message_t * pMessage, String & strData, uint16_t pDataBuf[]) {
+bool UpdateCurrentData(CAN_message_t * pMessage, String &strData, uint16_t pDataBuf[]) {
+	bool bResult = true;
 	uint8_t index = 0;
 
 	// Match index to data array for proper storage
@@ -370,15 +376,20 @@ void UpdateCurrentData(CAN_message_t * pMessage, String & strData, uint16_t pDat
 			break;
 
 		default:
+			bResult = false;
 			DebugPrintln("NO CURRENT DATA READ");
-			return;
 	}
 
-	// Store most recent phase current data to array
-	pDataBuf[index] = (pMessage->buf[1] << 8) | pMessage->buf[2];
+	// Check the incoming message is phase current
+	if (bResult) {
+		// Store most recent phase current data to array
+		pDataBuf[index] = (pMessage->buf[1] << 8) | pMessage->buf[2];
 
-	// Convert data to string
-	for (size_t i = 0; i < 4; ++i) {
-		strData += String(pDataBuf[i]) + DELIMITER;
+		// Convert data to string
+		for (size_t i = 0; i < 4; ++i) {
+			strData += String(pDataBuf[i]) + DELIMITER;
+		}
 	}
+
+	return bResult;
 }
