@@ -5,25 +5,36 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
-#include <Arduino.h>
-#include <stdint.h>
-#include <stdlib.h>
+#include "general.h"
+#include "pin.h"
+#include "DAQ.h"
 
 /*------------------------------------------
  Macros - Hall Effect Sensor Percentages
 ------------------------------------------*/
-#define BSPD_CHECK           5
-#define PERCENT_THRESHOLD    5
-#define PERCENT_BRAKE        10
+#define PLAUSIBILITY_CHECK   5
+#define PERCENT_THRESHOLD    10
+#define PERCENT_BRAKE        20
 #define PERCENT_ACCEL        25
 #define APPS_AGREEMENT       10
 
 /*------------------------------------------
  Macros - Other
 ------------------------------------------*/
-#define ARRAY_SIZE           40
+#define ARRAY_SIZE           6000
 #define NUM_SENSORS          3
+#define OOR_LOWER_BOUND		 5
+#define OOR_UPPER_BOUND		 1023
+#define OOR_LOWER_PERCENT    -0.10
+#define OOR_UPPER_PERCENT    1.10
 // #define NORMALIZED_OUTPUT
+
+#ifdef NORMALIZED_OUTPUT
+	#define UPDATE_APPS_BUFFER(APPS) APPS->buffer.PushBuffer( APPS->GetNormalizedRawOutput() );
+#else
+	#define UPDATE_APPS_BUFFER(APPS) APPS->buffer.PushBuffer( APPS->GetRawOutput() );
+#endif
+
 
 /*-------------------------------------------------------------------------------------------------
  Hall Effect Processing
@@ -56,16 +67,17 @@ class circularBuffer {
         size_t capacity;
 };
 
+// Hall effect pedal sensor object
 class hall {    
     public:
         // Constructor
         circularBuffer buffer; // Circular buffer for signal averaging
-        hall(const uint8_t pinValue) : buffer( (size_t) ARRAY_SIZE ) {
-            pin = pinValue;
-        }
+		analogPin pin; // Pedal sensor pin
+
+        hall(const uint8_t pinValue);
         
         // Getters
-        // uint16_t GetRawSupply() { return rawSupply; }
+        uint16_t GetRawSupply() { return rawSupply; }
         uint16_t GetRawOutput() { return rawOutput; }
         uint16_t GetNormalizedRawOutput() { return normalizedRawOutput; }
         uint16_t GetCookedOutput() { return cookedOutput; }
@@ -75,7 +87,7 @@ class hall {
         uint16_t GetPercentRequestUpperBound() { return upper; }
 
         // Setters
-        // void SetRawSupply(uint16_t value) { rawSupply = value; }
+        void SetRawSupply(uint16_t value) { rawSupply = value; }
         void SetRawOutput(uint16_t value) { rawOutput = value; }
         void SetNormalizedRawOutput(uint16_t value) { normalizedRawOutput = value; }
         void SetCookedOutput(uint16_t value) { cookedOutput = value; }
@@ -86,13 +98,13 @@ class hall {
 
         // Data methods
         uint16_t ReadPedal();
-        // uint16_t ReadSupply();
+        uint16_t ReadSupply();
 
         float GetPercentRequest();
 
     private:
         // Pedal supply, signal, and processed signal data
-        // static uint16_t rawSupply; // Static for shared data
+        static uint16_t rawSupply; // Static for shared data
         uint16_t rawOutput;
         uint16_t normalizedRawOutput;
         uint16_t cookedOutput;
@@ -101,13 +113,15 @@ class hall {
         // Pedal signal percent request bounds
         uint16_t lower;
         uint16_t upper;
-
-        uint8_t pin;
 };
 
 /*-------------------------------------------------------------------------------------------------
  Prototypes
 -------------------------------------------------------------------------------------------------*/
+bool ReadyToDrive(hall * pBSE, digitalPin pinBSE);
+
+void ActivateBrakeLight(hall * pBSE, digitalPin pinBrakeLight);
+
 void AverageSignal(hall * pAPPS);
 
 void ProcessAPPS(hall * pAPPS1, hall * pAPPS2, uint8_t * pTorqueBuf);
@@ -120,11 +134,13 @@ float GetLowerPercentAPPS(hall * pAPPS1, hall * pAPPS2);
 
 bool CheckAPPS(hall * pAPPS1, hall * pAPPS2);
 
+bool CheckPedalOOR(hall * pSensor);
+
 bool CheckPedalsOOR(hall * pAPPS1, hall * pAPPS2, hall * pBSE);
 
 bool CheckPedalPlausibility(hall * pAPPS1, hall * pAPPS2, hall * pBSE);
 
-bool CheckPedalImplausibility(hall * pAPPS1, hall * pAPPS2, hall * pBSE, elapsedMillis * pPedalErrorTimer);
+bool CheckPedalImplausibility(hall * pAPPS1, hall * pAPPS2, hall * pBSE);
 
 bool CheckAllErrors(hall * pAPPS1, hall * pAPPS2, hall * pBSE, bool b100msPassed);
 
@@ -135,6 +151,12 @@ bool PedalsDisagree();
 bool BothPedalsPressed();
 
 bool PedalsOOR();
+
+bool SetPedalBounds(hall * pAPPS1, hall * pAPPS2, hall * pBSE);
+
+void CalibratePedals(hall * pAPPS1, hall * pAPPS2, hall * pBSE, digitalPin pin);
+
+bool DetectCalibrationStartup();
 
 // End safe guards
 #endif /* HALL_H */
