@@ -1,9 +1,9 @@
 /*-------------------------------------------------------------------------------------------------
  ECU Pedal Calibration Program
  Programmer: Ethan Wofse
- Last Updated: 03.06.25
+ Last Updated: 03.19.25
 -------------------------------------------------------------------------------------------------*/
-#include "ECU.h"
+#include "core/ECU.h"
 
 /*-----------------------------------------------------------------------------
  Detect if driver initiates calibration mode startup sequence
@@ -13,7 +13,7 @@ bool DetectCalibrationStartup() {
 	bool bResult = false;
 
 	// Detect if RTD button has been held for three seconds
-	if ( bPedalCalibrationMode && ( millis() - timer >= PEDAL_CALIBRATION_TIME ) ) {
+	if ( IRQHandler::GetCalibrationMode() && ( millis() - timer >= PEDAL_CALIBRATION_TIME ) ) {
 		// Reset timer
 		timer = millis();
 
@@ -38,7 +38,7 @@ void CalibratePedals(hall * pAPPS1, hall * pAPPS2, hall * pBSE, digitalPin pin) 
 	// Blocking operation - Nothing on the car should be active during calibration
 	while (!bDone) {
 		// Feed Watchdog
-		FeedWDT();
+		IRQHandler::FeedWDT();
 
 		// Pedal Calibration FSM
 		switch (FSM_State) {

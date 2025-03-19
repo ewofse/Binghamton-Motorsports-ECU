@@ -1,9 +1,9 @@
 /*-------------------------------------------------------------------------------------------------
- ECU Master Program
+ ECU Master Program (EV1 / EV1.5)
  Programmers: Markus Higgins, Vansh Joishar, Jake Lin, Ethan Wofse
- Last Updated: 03.07.25
+ Last Updated: 03.19.25
 -------------------------------------------------------------------------------------------------*/
-#include "ECU.h"
+#include "core/ECU.h"
 
 FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 WDT_T4<WDT1> WDT;
@@ -38,15 +38,6 @@ timers_t timers;
 // FSM current state
 state_t FSM_State;
 
-// Interrupt variables
-volatile uint8_t errorBuf = 0;
-volatile bool bShutdownCircuitOpen = false;
-volatile bool bPedalCalibrationMode = false;
-
-// TODO: Use an external timer module on Teensy and interrupts to sample pedal sensors instead of polling
-// TODO: extern variables are bad!!! Fix please...
-IntervalTimer samplingTimer;
-
 /*-------------------------------------------------------------------------------------------------
  Setup
 -------------------------------------------------------------------------------------------------*/
@@ -65,22 +56,19 @@ void setup() {
 
 	// Initialize CAN communications
     ConfigureCANBus();
-	DebugPrintln("CAN BUS INITIALIZED");
 
     // Setup WDT for potential software hangs
-    ConfigureWDT();
-	DebugPrintln("WATCHDOG CONFIGURED");
+    IRQHandler::ConfigureWDT();
 
     // Setup data read requests to Bamocar
     RequestBamocarData();
-    DebugPrintln("REQUESTING BAMOCAR DATA...");
 
 	// Intialize timer boolean variables
 	timers.bResetTimerStarted  = false;
 	timers.bChargeTimerStarted = false;
 	timers.bBuzzerActive       = false;
 
-	// Set RTD button pin to be interrupt controlled for pedal calibration
+    // Set RTD button pin to be interrupt controlled for pedal calibration
 	attachInterrupt(digitalPinToInterrupt( pinRTDButton.GetPin() ), PedalCalibrationISR, CHANGE);
 
     FSM_State = PEDALS;
@@ -94,7 +82,7 @@ void loop() {
 	uint8_t faultBuf = 0;
 
     // Feed the WDT
-    FeedWDT();
+    IRQHandler::FeedWDT();
 
     // Driving logic FSM
     switch (FSM_State) {
@@ -110,7 +98,8 @@ void loop() {
 			// Begin calibration
 			CalibratePedals(&APPS1, &APPS2, &BSE, pinRTDButton);
 
-			bPedalCalibrationMode = false;
+            // Set calibration mode flag low
+            IRQHandler::SetCalibrationMode(false);
 
 			// Set RTD button pin to be interrupt controlled for pedal calibration
 			attachInterrupt(digitalPinToInterrupt( pinRTDButton.GetPin() ), PedalCalibrationISR, CHANGE);
@@ -211,7 +200,7 @@ void loop() {
             stateBuf = 1;
 
 			// Transition to FAULT if any possible error occurs
-			if ( CheckAllErrors(&APPS1, &APPS2, &BSE, timers.b100msPassed) || bShutdownCircuitOpen ) {
+			if ( CheckAllErrors(&APPS1, &APPS2, &BSE, timers.b100msPassed) || IRQHandler::GetShutdownState() ) {
 				FSM_State = FAULT;
 				return;
 			}
@@ -251,7 +240,7 @@ void loop() {
 			stateBuf = 2;
 
             // Transition to FAULT if any possible error occurs
-            if ( CheckAllErrors(&APPS1, &APPS2, &BSE, timers.b100msPassed) || bShutdownCircuitOpen ) {
+            if ( CheckAllErrors(&APPS1, &APPS2, &BSE, timers.b100msPassed) || IRQHandler::GetShutdownState() ) {
                 FSM_State = FAULT;
                 return;
             }
@@ -285,7 +274,7 @@ void loop() {
 			stateBuf = 3;
 
             // Transition to FAULT if any possible error occurs
-            if ( CheckAllErrors(&APPS1, &APPS2, &BSE, timers.b100msPassed) || bShutdownCircuitOpen ) {
+            if ( CheckAllErrors(&APPS1, &APPS2, &BSE, timers.b100msPassed) || IRQHandler::GetShutdownState() ) {
                 FSM_State = FAULT;
                 return;
             }
@@ -317,7 +306,7 @@ void loop() {
 			stateBuf = 4;
 
             // Transition to FAULT if any possible error occurs
-            if ( CheckAllErrors(&APPS1, &APPS2, &BSE, timers.b100msPassed) || bShutdownCircuitOpen ) {
+            if ( CheckAllErrors(&APPS1, &APPS2, &BSE, timers.b100msPassed) || IRQHandler::GetShutdownState() ) {
                 FSM_State = FAULT;
                 return;
             }
@@ -342,6 +331,7 @@ void loop() {
         -----------------------------------------------------------------------------*/
         case (FAULT): {
             static bool bErrorsWritten = false;
+            uint8_t errors;
 
             DebugPrintln("STATE: FAULT");
 
@@ -349,10 +339,10 @@ void loop() {
             
 			// Print which errors occurred (binary format) (OOR, BPP, DIS, SDC)
 			DebugPrint("VEHICLE ERRORS: ");
-			DebugPrint( bitRead(errorBuf, ERROR_CODE_OOR) );
-			DebugPrint( bitRead(errorBuf, ERROR_CODE_APPS_BSE) );
-			DebugPrint( bitRead(errorBuf, ERROR_CODE_DISAGREE) );
-			DebugPrintln( bitRead(errorBuf, ERROR_CODE_SHUTDOWN) );
+			DebugPrint( bitRead(faultBuf, ERROR_CODE_OOR) );
+			DebugPrint( bitRead(faultBuf, ERROR_CODE_APPS_BSE) );
+			DebugPrint( bitRead(faultBuf, ERROR_CODE_DISAGREE) );
+			DebugPrintln( bitRead(faultBuf, ERROR_CODE_SHUTDOWN) );
 
             DeactivateBamocar(pinRUN, pinGO);
 
@@ -361,13 +351,17 @@ void loop() {
             
             // Revert to another state when pedal signals are not implausible
             if ( !PedalsDisagree() && !PedalsOOR() ) {
+                // Obtain the error buffer
+                errors = IRQHandler::GetErrorBuffer();
+
                 // APPS / Brake Pedal Plausability Check resolved
                 if ( BothPedalsPressed() && GetLowerPercentAPPS(&APPS1, &APPS2) * 100 < PLAUSIBILITY_CHECK ) {
                     // Re-activate motor controller enable signals
                     ActivateBamocar(pinRUN, pinGO);
                     
                     // Clear both pedals pressed error bit and revert to IDLE
-                    errorBuf &= ~(1 << ERROR_CODE_APPS_BSE);
+                    IRQHandler::SetErrorBuffer( errors & ~(1 << ERROR_CODE_APPS_BSE) );
+
                     bErrorsWritten = false;
                     FSM_State = IDLE;
 
@@ -377,8 +371,9 @@ void loop() {
                 // Check shutdown tap closes again
                 if ( ShutdownCircuitOpen() && pinSDCTap.ReadDebouncedPin() ) {
                     // Clear both shutdown open error bit and revert to RTD
-                    errorBuf &= ~(1 << ERROR_CODE_SHUTDOWN);
-                    bShutdownCircuitOpen = false;
+                    IRQHandler::SetErrorBuffer( errors & ~(1 << ERROR_CODE_SHUTDOWN) );
+                    IRQHandler::SetShutdownState(false);
+
                     bErrorsWritten = false;
                     FSM_State = WAIT_FOR_RTD;
 
@@ -424,6 +419,6 @@ void loop() {
 	/*-----------------------------------------------------------------------------
      Telemetry & Status CAN Messages
     -----------------------------------------------------------------------------*/
-    faultBuf = errorBuf;
+    faultBuf = IRQHandler::GetErrorBuffer();
     SendCANStatusMessages(&faultBuf, &stateBuf);
 }	

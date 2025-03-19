@@ -6,11 +6,12 @@
  Libraries - Master Include
 -------------------------------------------------------------------------------------------------*/
 #include "general.h"
-#include "CAN.h"
-#include "hall.h"
-#include "ISR.h"
 #include "pin.h"
-#include "DAQ.h"
+#include "comms/CAN.h"
+#include "interrupts/interrupts.h"
+#include "daq/DAQ.h"
+#include "sensors/hall.h"
+#include "sensors/pedals.h"
 
 // End safe guards
 #endif

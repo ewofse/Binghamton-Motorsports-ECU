@@ -1,4 +1,4 @@
-#include "CAN.h"
+#include "comms/CAN.h"
 
 /*-----------------------------------------------------------------------------
  Configure the CAN bus network
@@ -19,6 +19,8 @@ void ConfigureCANBus() {
 
 	// Set a callback function used to process incoming messages
 	myCan.onReceive(ProcessCANMessage);
+
+	DebugPrintln("CAN BUS INITIALIZED");
 }
 
 /*-----------------------------------------------------------------------------
@@ -231,4 +233,6 @@ void RequestBamocarData() {
 	SendCANMessage(msgBamocarRequest);
 	msgBamocarRequest.buf[1] = REG_CURRENT_PHASE_3;
 	SendCANMessage(msgBamocarRequest);
+
+	DebugPrintln("REQUESTING BAMOCAR DATA...");
 }

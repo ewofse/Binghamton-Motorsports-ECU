@@ -53,6 +53,7 @@
 /*------------------------------------------
  Macros - Other
 ------------------------------------------*/
+#define ARRAY_SIZE               6000
 #define DELIMITER            	 ','
 #define ADC_RESOLUTION       	 TEN_BITS
 #define ERROR_CODE_SHUTDOWN  	 0

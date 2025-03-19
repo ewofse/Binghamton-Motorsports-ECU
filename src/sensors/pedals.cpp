@@ -1,107 +1,4 @@
-#include "hall.h"
-
-// Intialize raw supply for all sensors
-uint16_t hall::rawSupply = 0;
-
-/*-----------------------------------------------------------------------------
- Circular buffer construtor
------------------------------------------------------------------------------*/
-circularBuffer::circularBuffer(const size_t elements) {
-    // Declare memory for buffer and set head and tail start and end
-    pBuffer = (uint16_t *) calloc( elements, sizeof(uint16_t) );
-    pHead = pBuffer + elements - 1;
-    pTail = pBuffer;
-
-    // Initialize sum of buffer & number of elements
-    total = 0;
-    count = 0;
-    capacity = elements;
-}
-
-/*-----------------------------------------------------------------------------
- Hall effect sensor pedal constructor
------------------------------------------------------------------------------*/
-hall::hall(const uint8_t pinValue)
-	// Initialize a circular buffer and analog pin
-	: buffer( (size_t) ARRAY_SIZE ), pin(pinValue, INPUT) {}
-
-/*-----------------------------------------------------------------------------
- Add element to circular buffer
------------------------------------------------------------------------------*/
-void circularBuffer::PushBuffer(uint16_t value) {
-    // Subtract old value from total sum
-    total -= *pHead;
-
-    // Store inputted data into current buffer head
-    *pHead = value;
-
-    // Add new value to total sum
-    total += *pHead;
-
-    // Wrap around when reaching the end of buffer
-    if (pHead == pBuffer + capacity) {
-        pHead = pBuffer;
-    }
-
-    // Advance the head to the next element
-    ++pHead;
-
-    // Update current element counter and tail
-    if (count == capacity) {
-        // Advance the tail to the next element
-        ++pTail;
-
-        // Wrap around when reaching the end of buffer
-        if (pTail == pBuffer + capacity) {
-            pTail = pBuffer;
-        }
-    } else {
-        ++count;
-    }
-}
-
-/*-----------------------------------------------------------------------------
- Obtain an element from circular buffer
------------------------------------------------------------------------------*/
-uint16_t circularBuffer::PullBuffer() {
-    // Return the value at the head of buffer if the head is valid
-    return (pHead >= pBuffer) && (pHead < pBuffer + count - 1) ? *pHead : 0;
-}
-
-/*-----------------------------------------------------------------------------
- Free all allocated memory from object
------------------------------------------------------------------------------*/
-void circularBuffer::FreeBuffer() {
-    // Free memory (this includes head & tail)
-    free(pBuffer);
-
-    // Set pointer to null to prevent dangling pointer
-    pBuffer = nullptr;
-}
-
-/*-----------------------------------------------------------------------------
- Obtain the analog value of pedal
------------------------------------------------------------------------------*/
-uint16_t hall::ReadPedal() {
-    // Read outputted voltage signal - 10-bit resolution
-    return pin.ReadRawPinAnalog();
-}
-
-/*-----------------------------------------------------------------------------
- Read the voltage of the 12 LV battery (for a normalized spply)
------------------------------------------------------------------------------*/
-uint16_t hall::ReadSupply() {
-    // Read outputted voltage signal - 10-bit resolution
-    return 0; // analogRead(PIN_VREF);
-}
-
-/*-----------------------------------------------------------------------------
- Obtain the percent of pedal pressed
------------------------------------------------------------------------------*/
-float hall::GetPercentRequest() {
-    // Interpolate the analog value through a percent request
-    return (float) (cookedOutput - lower) / (upper - lower);
-}
+#include "sensors/pedals.h"
 
 /*-----------------------------------------------------------------------------
  Check for driver RTD input
@@ -118,7 +15,7 @@ bool ReadyToDrive(hall * pBSE, digitalPin pinBSE) {
 -----------------------------------------------------------------------------*/
 void ActivateBrakeLight(hall * pBSE, digitalPin pinBrakeLight) {
 	// Check if brake is significantly pressed to activate brake light
-	if ( ( pBSE->GetPercentRequest() * 100 ) > PERCENT_BRAKE ) {
+	if ( pBSE->GetPercentRequest() * 100 > PERCENT_BRAKE ) {
 		pinBrakeLight.WriteOutput(HIGH);
 	} else {
 		pinBrakeLight.WriteOutput(LOW);
@@ -130,7 +27,7 @@ void ActivateBrakeLight(hall * pBSE, digitalPin pinBrakeLight) {
 -----------------------------------------------------------------------------*/
 void AverageSignal(hall * pAPPS) {
     // Modify signal buffer by adding newest reading
-	UPDATE_APPS_BUFFER(pAPPS);
+    pAPPS->buffer.PushBuffer( pAPPS->GetRawOutput() );
 
     // Calculate new average and up scale
     uint16_t average = pAPPS->buffer.GetTotal() / pAPPS->buffer.GetCount();
@@ -165,13 +62,6 @@ void UpdatePedalData(hall * pSensor) {
     // Read the raw signal from input analog pin
     pSensor->SetRawOutput( pSensor->ReadPedal() );
 
-    // Calculate the normalized analog pin voltage
-    // float ratio = (float) ( pSensor->GetRawOutput() / pSensor->GetRawSupply() );
-    // uint16_t normalized = (uint16_t) ( ratio * ADC_RESOLUTION );
-
-    // Set the normalized raw output
-    // pSensor->SetNormalizedRawOutput(normalized);
-
     // Average normalized signal
     AverageSignal(pSensor);
 
@@ -191,9 +81,6 @@ void UpdatePedalData(hall * pSensor) {
  Update pedal data for all hall sensors
 -----------------------------------------------------------------------------*/
 void UpdatePedalStructures(hall * pAPPS1, hall * pAPPS2, hall * pBSE) {
-    // Update reference voltage for all sensors
-    pAPPS1->SetRawSupply( pAPPS1->ReadSupply() );
-
     // Update pedal data for each hall sensor
     UpdatePedalData(pAPPS1);
     UpdatePedalData(pAPPS2);
@@ -272,13 +159,14 @@ bool CheckPedalImplausibility(hall * pAPPS1, hall * pAPPS2, hall * pBSE) {
             pedalErrorTimer = 0;
             bPedalError = true;
         } else if (pedalErrorTimer > IMPLAUSIBILITY_TIME) {
-            DebugPrint("PEDAL ERROR TIMER: "); DebugPrintln(pedalErrorTimer);
-
+            // Return true when error(s) occurs for 100 ms 
             bResult = true;
+            
+            // Reset error check flag
             bPedalError = false;
         }
     } else {
-        // Return false if either/both errors resolve in less than 100 ms
+        // Return false if either/both error(s) resolve in less than 100 ms
         bPedalError = false;
     }
 
@@ -290,10 +178,12 @@ bool CheckPedalImplausibility(hall * pAPPS1, hall * pAPPS2, hall * pBSE) {
 -----------------------------------------------------------------------------*/
 bool CheckAllErrors(hall * pAPPS1, hall * pAPPS2, hall * pBSE, bool b100msPassed) {
     bool bResult = false;
+    uint8_t errors = IRQHandler::GetErrorBuffer();
 
     // Check if pedal sensors disagree
     if ( b100msPassed && !CheckAPPS(pAPPS1, pAPPS2) ) {
-        errorBuf |= (1 << ERROR_CODE_DISAGREE);
+        // Set the APPS disagrement error bit high
+        IRQHandler::SetErrorBuffer( errors | (1 << ERROR_CODE_DISAGREE) );
         bResult = true;
 
         DebugPrintln("ERROR: APPS DISAGREE");
@@ -301,7 +191,8 @@ bool CheckAllErrors(hall * pAPPS1, hall * pAPPS2, hall * pBSE, bool b100msPassed
 
     // Check if accelerator and brake are both pressed
     if ( CheckPedalPlausibility(pAPPS1, pAPPS2, pBSE) ) {
-        errorBuf |= (1 << ERROR_CODE_APPS_BSE);
+        // Set the APPS & BSE disagrement error bit high
+        IRQHandler::SetErrorBuffer( errors | (1 << ERROR_CODE_APPS_BSE) );
         bResult = true;
 
         DebugPrintln("ERROR: APPS & BSE PRESSED");
@@ -309,7 +200,8 @@ bool CheckAllErrors(hall * pAPPS1, hall * pAPPS2, hall * pBSE, bool b100msPassed
 
     // Check if any of the three sensors are out of range
     if ( b100msPassed && CheckPedalsOOR(pAPPS1, pAPPS2, pBSE) ) {
-        errorBuf |= (1 << ERROR_CODE_OOR);
+        // Set the pedals out of range disagrement error bit high
+        IRQHandler::SetErrorBuffer( errors | (1 << ERROR_CODE_OOR) );
         bResult = true;
 
         DebugPrintln("ERROR: SENSOR(S) OUT OF RANGE");
@@ -323,7 +215,7 @@ bool CheckAllErrors(hall * pAPPS1, hall * pAPPS2, hall * pBSE, bool b100msPassed
 -----------------------------------------------------------------------------*/
 bool ShutdownCircuitOpen() {
     // Check if shutdown circuit open
-    return errorBuf & (1 << ERROR_CODE_SHUTDOWN);
+    return IRQHandler::GetErrorBuffer() & (1 << ERROR_CODE_SHUTDOWN);
 }
 
 /*-----------------------------------------------------------------------------
@@ -331,7 +223,7 @@ bool ShutdownCircuitOpen() {
 -----------------------------------------------------------------------------*/
 bool PedalsDisagree() {
     // Check if pedals disagree
-    return errorBuf & (1 << ERROR_CODE_DISAGREE);
+    return IRQHandler::GetErrorBuffer() & (1 << ERROR_CODE_DISAGREE);
 }
 
 /*-----------------------------------------------------------------------------
@@ -339,7 +231,7 @@ bool PedalsDisagree() {
 -----------------------------------------------------------------------------*/
 bool BothPedalsPressed() {
     // Check if both pedals are pressed
-    return errorBuf & (1 << ERROR_CODE_APPS_BSE);
+    return IRQHandler::GetErrorBuffer() & (1 << ERROR_CODE_APPS_BSE);
 }
 
 /*-----------------------------------------------------------------------------
@@ -347,10 +239,9 @@ bool BothPedalsPressed() {
 -----------------------------------------------------------------------------*/
 bool PedalsOOR() {
     // Check if pedals are out of range
-    return errorBuf & (1 << ERROR_CODE_OOR);
+    return IRQHandler::GetErrorBuffer() & (1 << ERROR_CODE_OOR);
 }
 
-// TODO: Could change this to an array of hall effect objects for robustness
 /*-----------------------------------------------------------------------------
  Extract encoded values from SD file to set bounds for percent requests
 -----------------------------------------------------------------------------*/

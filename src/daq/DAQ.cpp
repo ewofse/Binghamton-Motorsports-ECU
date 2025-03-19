@@ -1,4 +1,4 @@
-#include "DAQ.h"
+#include "daq/DAQ.h"
 
 /*-----------------------------------------------------------------------------
  Count the number of instances of a character in a string
@@ -191,7 +191,7 @@ void ErrorToSD() {
 	// Iterate through each error bit from MSB to LSB
 	for (int8_t currentBit = errorLength - 1; currentBit >= 0; --currentBit) {
 		// Read the current bit
-        bBitHigh = bitRead(errorBuf, currentBit);
+        bBitHigh = bitRead(IRQHandler::GetErrorBuffer(), currentBit);
 
 		// Check if the current bit is high
 		if (bBitHigh) {
