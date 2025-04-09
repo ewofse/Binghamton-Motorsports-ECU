@@ -6,6 +6,7 @@
  Libraries
 -------------------------------------------------------------------------------------------------*/
 #include "core/general.h"
+#include "interrupts/interrupts.h"
 
 /*-------------------------------------------------------------------------------------------------
  Initializations for CAN Communication
@@ -49,7 +50,7 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 /*------------------------------------------
  Macros - Custom CAN protocol
 ------------------------------------------*/
-#define ID_BATTERY_TEMP          0x680
+#define ID_BATTERY_TEMP          0x6B1
 #define ID_ERROR_CODE        	 0x681
 #define ID_CURRENT_STATE     	 0x682
 #define ID_TEMP              	 0x001
@@ -76,12 +77,14 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 #define STATUS_MESSAGE_INTERVAL	 50
 #define NUM_MESSAGES_TX		 	 6
 
+#define PACK_THRESHOLD           60
+
 /*-------------------------------------------------------------------------------------------------
  Prototypes
 -------------------------------------------------------------------------------------------------*/
 void ConfigureCANBus();
 
-void ProcessCANMessage(const CAN_message_t &message);
+void ProcessCANMessage(const CAN_message_t & message);
 
 void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, 
     uint8_t * pMessageBuf, uint8_t bamocarDestReg);
@@ -90,10 +93,10 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint
     uint8_t transmissionInterval);
 void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint8_t * pMessageBuf);
 
-bool MapCANMessage(uint8_t REGID, CAN_message_t &message);
+bool MapCANMessage(CAN_message_t & message);
 
-void SendCANMessage(const CAN_message_t &message);
-void SendCANMessage(const CAN_message_t &message, const FLEXCAN_MAILBOX MB);
+void SendCANMessage(const CAN_message_t & message);
+void SendCANMessage(const CAN_message_t & message, const FLEXCAN_MAILBOX MB);
 
 void SendCANStatusMessages(uint8_t * errors, uint8_t * state);
 

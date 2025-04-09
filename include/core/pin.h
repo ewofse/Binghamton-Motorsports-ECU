@@ -21,10 +21,6 @@
     #define PIN_RUN              13
     #define PIN_GO               17
     #define PIN_BRAKE_LIGHT      33
-    #define PIN_LED_FAULT        13
-    #define PIN_REGEN            14
-    #define PIN_CHARGE_ENABLE    11
-	#define PIN_PUMP			 34
 #elif defined(EV1)
     #define PIN_BSE              A10 // Left
     #define PIN_APPS_ONE         A13 // Second Right
@@ -36,10 +32,14 @@
     #define PIN_RUN              21
     #define PIN_GO               22
     #define PIN_BRAKE_LIGHT      19
-    #define PIN_AIR_PLUS         41
 #endif
 
-// #define PIN_VREF
+// Model specific pins
+#define PIN_LED_FAULT            0
+#define PIN_PUMP			     34
+#define PIN_AIR_PLUS             41
+
+// General / shared pins
 #define PIN_RTD_SOUND            20
 #define PIN_GPIO0                0
 #define PIN_GPIO1                1
@@ -55,32 +55,16 @@
  Macros - Vehicle-Specific Pin Functions
 ------------------------------------------*/
 #ifdef EV1
-    #define PIN_AIR_PLUS_INSTANTIATION digitalPin pinAIRPlus(PIN_AIR_PLUS, OUTPUT);
-	#define EV1_AIR_PLUS_HIGH() pinAIRPlus.WriteOutput(HIGH);
+	#define EV1_AIR_PLUS_HIGH() system.GetAIRPlusPin().WriteOutput(HIGH)
 #else
-    #define PIN_AIR_PLUS_INSTANTIATION
 	#define EV1_AIR_PLUS_HIGH()
 #endif
 
 #ifdef EV1_5
-    #define PIN_PUMP_INSTANTIATION digitalPin pinPump(PIN_PUMP, OUTPUT);
-    #define PIN_REGEN_INSTANTIATION digitalPin pinRegen(PIN_REGEN, OUTPUT);
-    #define PIN_CHARGE_ENABLE_INSTANTIATION digitalPin pinChargeEnable(PIN_CHARGE_ENABLE, OUTPUT);
-    #define PIN_LED_FAULT_INSTANTIATION digitalPin pinFaultLED(PIN_LED_FAULT, OUTPUT);
-
-	#define EV1_5_TOGGLE_FAULT_LED() pinFaultLED.WriteOutput( !pinFaultLED.ReadRawPinDigital() );
-	#define EV1_5_ACTIVATE_FAULT_LED() ActivateFaultLED();
-	
+	#define EV1_5_TOGGLE_FAULT_LED() digitalWriteFast( PIN_LED_FAULT, !digitalReadFast(PIN_LED_FAULT) )
     #define EV1_5_PUMP_CONTROL()
 #else
-    #define PIN_PUMP_INSTANTIATION
-    #define PIN_REGEN_INSTANTIATION
-    #define PIN_CHARGE_ENABLE_INSTANTIATION
-    #define PIN_LED_FAULT_INSTANTIATION
-
 	#define EV1_5_TOGGLE_FAULT_LED()
-	#define EV1_5_ACTIVATE_FAULT_LED()
-
     #define EV1_5_PUMP_CONTROL()
 #endif
 
@@ -120,35 +104,25 @@ class digitalPin : public GPIO {
         bool ReadPulsedPin(bool signal);
     
     private:
-        uint16_t debounceTime;
         uint32_t debounceTimer;
+        uint16_t debounceTime;
 
         bool lastRawState;
         bool currentRawState;
-        bool currentStableState;
-        bool lastStableState;
+        bool debounceOutput;
+        bool lastDebounceOutput;
 };
 
 // Analog GPIO pin object
 class analogPin : public GPIO {
     public:
         // Constructor
-        analogPin(const uint8_t pinValue, bool pPinMode);
+        analogPin(const uint8_t pinValue, bool bPinMode);
 
         // Data methods
         void SetOutput(uint16_t value) { analogWrite(pin, value); }
         uint16_t ReadRawPinAnalog() { return analogRead(pin); }
 };
-
-
-/*-------------------------------------------------------------------------------------------------
- Prototypes
--------------------------------------------------------------------------------------------------*/
-void ActivateBamocar(digitalPin pinRUN, digitalPin pinGO);
-
-void DeactivateBamocar(digitalPin pinRUN, digitalPin pinGO);
-
-void ActivateFaultLED();
 
 // End safe guards
 #endif /* PIN_H */

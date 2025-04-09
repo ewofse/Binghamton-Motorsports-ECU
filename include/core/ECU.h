@@ -11,7 +11,7 @@
 #include "interrupts/interrupts.h"
 #include "daq/DAQ.h"
 #include "sensors/hall.h"
-#include "sensors/pedals.h"
+#include "FSM.h"
 
 // End safe guards
-#endif
+#endif /* ECU_H */

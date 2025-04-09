@@ -1,5 +1,8 @@
 #include "comms/CAN.h"
 
+// Vehicle CAN bus
+FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
+
 /*-----------------------------------------------------------------------------
  Configure the CAN bus network
 -----------------------------------------------------------------------------*/
@@ -26,8 +29,9 @@ void ConfigureCANBus() {
 /*-----------------------------------------------------------------------------
  Read a CAN message using interrupts (FIFO)
 -----------------------------------------------------------------------------*/
-void ProcessCANMessage(const CAN_message_t &message) {
-	CAN_message_t msgPiRX = message;
+void ProcessCANMessage(const CAN_message_t & message) {
+	CAN_message_t messageCopy = message;
+	uint8_t batteryTemperature = 0;
 
 	// Print the message ID and DLC
 	DebugPrint("ID: 0x"); DebugPrintHEX(message.id);
@@ -40,14 +44,16 @@ void ProcessCANMessage(const CAN_message_t &message) {
 		DebugPrint(" ");
 	}
 	
-	// Check the message is from the Bamocar and send to dashboard
-	if ( message.id == ID_CAN_MESSAGE_TX && MapCANMessage(message.buf[0], msgPiRX) ) {
-		SendCANMessage(msgPiRX);
-	}
+	// Check the message is from the Bamocar or Orion BMS
+	if ( message.id == ID_CAN_MESSAGE_TX && MapCANMessage(messageCopy) ) {
+		// Send the data to the dashboard
+		SendCANMessage(messageCopy);
+	} else if (message.id == ID_BATTERY_TEMP) {
+		// Read the (highest) battery pack temperature
+		batteryTemperature = message.buf[0];
 
-	// Check the message is from the Orion
-	if ( message.id == ID_BATTERY_TEMP ) {
-		// TODO: Update PID controller with current temp reading
+		// Store battery temperature for PID controls
+		IRQHandler::SetBatteryTemperature(batteryTemperature);
 	}
 }
 
@@ -67,7 +73,7 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC,
 	pMessage->buf[0] = bamocarDestReg;
 
 	// Bamocar wants Litte Endian Format (LIFO)
-	for (int i = 1; i < DLC; ++i) {
+	for (uint8_t i = 1; i < DLC; ++i) {
 		pMessage->buf[i] = pMessageBuf[DLC - i];
 	}
 }
@@ -129,7 +135,7 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint
 	pMessage->len             =  DLC;
 
 	// Populate buffer for custom message (error, state, etc.)
-	for (int i = 0; i < DLC; ++i) {
+	for (uint8_t i = 0; i < DLC; ++i) {
 		pMessage->buf[i] = pMessageBuf[i];
 	}
 }
@@ -137,11 +143,11 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint
 /*-----------------------------------------------------------------------------
  Map a CAN message's ID, DLC, and data to another message
 -----------------------------------------------------------------------------*/
-bool MapCANMessage(uint8_t REGID, CAN_message_t &message) {
+bool MapCANMessage(CAN_message_t & message) {
 	bool bMapped = true;
 
 	// Match first byte of Bamocar message buffer to ID of Raspberry Pi message
-	switch (REGID) {
+	switch ( message.buf[0] ) {
 		// Motor temperature
 		case (REG_MOTOR_TEMP):
 			message.id = ID_TEMP;
@@ -164,7 +170,7 @@ bool MapCANMessage(uint8_t REGID, CAN_message_t &message) {
 /*-----------------------------------------------------------------------------
  Send a CAN message (to any transmitting mailbox)
 -----------------------------------------------------------------------------*/
-void SendCANMessage(const CAN_message_t &message) {
+void SendCANMessage(const CAN_message_t & message) {
 	myCan.write(message);
 	// DebugPrintln("MESSAGE SENT");
 }
@@ -172,7 +178,7 @@ void SendCANMessage(const CAN_message_t &message) {
 /*-----------------------------------------------------------------------------
  Send a CAN message to a specified transmitting mailbox
 -----------------------------------------------------------------------------*/
-void SendCANMessage(const CAN_message_t &message, const FLEXCAN_MAILBOX MB) {
+void SendCANMessage(const CAN_message_t & message, const FLEXCAN_MAILBOX MB) {
 	myCan.write(MB, message);
 	// DebugPrintln("MESSAGE SENT");
 }

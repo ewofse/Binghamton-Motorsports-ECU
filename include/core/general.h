@@ -20,8 +20,8 @@
 /*------------------------------------------
  Macros - Vehicle Model
 ------------------------------------------*/
-#define EV1
-// #define EV1_5
+// #define EV1
+#define EV1_5
 
 /*------------------------------------------
  Macros - Baud & Serial Rates
@@ -48,12 +48,12 @@
 #define DISCHARGE_TIME       	 1500
 #define SHUTDOWN_STABLE_TIME 	 500
 #define BUTTON_DEBOUNCE_TIME 	 5
-#define PEDAL_CALIBRATION_TIME	 3000
+#define PEDAL_CALIBRATION_TIME	 2000
 
 /*------------------------------------------
  Macros - Other
 ------------------------------------------*/
-#define ARRAY_SIZE               6000
+#define BUFFER_SIZE              6000
 #define DELIMITER            	 ','
 #define ADC_RESOLUTION       	 TEN_BITS
 #define ERROR_CODE_SHUTDOWN  	 0
@@ -99,8 +99,8 @@ typedef enum state {
 
 typedef enum calibrate {
 	UPDATE_PEDALS,
-    PERCENT_REQ_LOWER,
     PERCENT_REQ_UPPER,
+    PERCENT_REQ_LOWER,
     DONE
 } calibrate_t;
 
@@ -113,12 +113,6 @@ typedef struct timers {
     bool b100msPassed;
     bool bResetTimerStarted;
 } timers_t;
-
-typedef struct PWM {
-	Teensy_PWM * timer;
-	float frequency;
-	float dutyCycle;
-} PWM_t;
 
 // End safe guards
 #endif /* GENERAL_H */

@@ -1,37 +1,15 @@
-/*-------------------------------------------------------------------------------------------------
- ECU Pedal Calibration Program
- Programmer: Ethan Wofse
- Last Updated: 03.19.25
--------------------------------------------------------------------------------------------------*/
-#include "core/ECU.h"
-
-/*-----------------------------------------------------------------------------
- Detect if driver initiates calibration mode startup sequence
------------------------------------------------------------------------------*/
-bool DetectCalibrationStartup() {
-	static uint32_t timer = millis();
-	bool bResult = false;
-
-	// Detect if RTD button has been held for three seconds
-	if ( IRQHandler::GetCalibrationMode() && ( millis() - timer >= PEDAL_CALIBRATION_TIME ) ) {
-		// Reset timer
-		timer = millis();
-
-		bResult = true;
-	}	
-
-	return bResult;
-}
+#include "core/FSM.h"
 
 /*-----------------------------------------------------------------------------
  Calibrate pedal sensor encoded values
 -----------------------------------------------------------------------------*/
-void CalibratePedals(hall * pAPPS1, hall * pAPPS2, hall * pBSE, digitalPin pin) {
+void systemData::CalibratePedals() {
 	uint16_t boundAPPS1 = 0;
 	uint16_t boundAPPS2 = 0;
 	uint16_t boundBSE = 0;
 
 	calibrate_t FSM_State = UPDATE_PEDALS;
+	uint8_t stateCounter = 0;
 	bool bDone = false;
 	char strPedalData[50] = "";
 	
@@ -46,11 +24,19 @@ void CalibratePedals(hall * pAPPS1, hall * pAPPS2, hall * pBSE, digitalPin pin) 
 			 Update Pedal Sensor Readings
 			-----------------------------------------------------------------------------*/
 			case (UPDATE_PEDALS):
-				UpdatePedalStructures(pAPPS1, pAPPS2, pBSE);
+				UpdatePedalStructures();
 
 				// Await driver RTD button input to set bounds
-				if ( pin.ReadDebouncedPin() ) {
-					FSM_State = PERCENT_REQ_UPPER;
+				if ( pinRTDButton.ReadPulsedPin( pinRTDButton.ReadDebouncedPin() ) ) {
+					// Increment state counter
+					++stateCounter;
+
+					// Move to next state based on how many times RTD button is pressed
+					if (stateCounter == 1) {
+						FSM_State = PERCENT_REQ_UPPER;
+					} else if (stateCounter == 2) {
+						FSM_State = PERCENT_REQ_LOWER;
+					}
 				}
 
 				break;
@@ -62,14 +48,14 @@ void CalibratePedals(hall * pAPPS1, hall * pAPPS2, hall * pBSE, digitalPin pin) 
 				char strUpperBounds[25] = "";
 
 				// Set upper bounds
-				boundAPPS1 = pAPPS1->GetCookedOutput();
-				boundAPPS2 = pAPPS2->GetCookedOutput();
-				boundBSE = pBSE->GetCookedOutput();
+				boundAPPS1 = APPS1.GetCookedOutput();
+				boundAPPS2 = APPS2.GetCookedOutput();
+				boundBSE = BSE.GetCookedOutput();
 
 				// Set current cooked output as upper bound for all sensors
-				pAPPS1->SetPercentRequestUpperBound(boundAPPS1);
-				pAPPS2->SetPercentRequestUpperBound(boundAPPS2);
-				pBSE->SetPercentRequestUpperBound(boundBSE);
+				APPS1.SetPercentRequestUpperBound(boundAPPS1);
+				APPS2.SetPercentRequestUpperBound(boundAPPS2);
+				BSE.SetPercentRequestUpperBound(boundBSE);
 
 				// Add pedal bound values to the string
 				sprintf(strUpperBounds, "%d,%d,%d,", boundAPPS1, boundAPPS2, boundBSE);
@@ -88,15 +74,15 @@ void CalibratePedals(hall * pAPPS1, hall * pAPPS2, hall * pBSE, digitalPin pin) 
 			case (PERCENT_REQ_LOWER): {
 				char strLowerBounds[25] = "";
 
-				// Set lower bounds
-				boundAPPS1 = pAPPS1->GetCookedOutput();
-				boundAPPS2 = pAPPS2->GetCookedOutput();
-				boundBSE = pBSE->GetCookedOutput();
+				// Set upper bounds
+				boundAPPS1 = APPS1.GetCookedOutput();
+				boundAPPS2 = APPS2.GetCookedOutput();
+				boundBSE = BSE.GetCookedOutput();
 
-				// Set current cooked output as lower bound for all sensors
-				pAPPS1->SetPercentRequestLowerBound(boundAPPS1);
-				pAPPS2->SetPercentRequestLowerBound(boundAPPS2);
-				pBSE->SetPercentRequestLowerBound(boundBSE);
+				// Set current cooked output as upper bound for all sensors
+				APPS1.SetPercentRequestLowerBound(boundAPPS1);
+				APPS2.SetPercentRequestLowerBound(boundAPPS2);
+				BSE.SetPercentRequestLowerBound(boundBSE);
 
 				// Add pedal bound values to the string
 				sprintf(strLowerBounds, "%d,%d,%d", boundAPPS1, boundAPPS2, boundBSE);
