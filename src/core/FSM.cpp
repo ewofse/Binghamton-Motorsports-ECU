@@ -4,18 +4,18 @@
  FSM data constructor
 -----------------------------------------------------------------------------*/
 systemData::systemData() :
-    APPS1(PIN_APPS_ONE),
-    APPS2(PIN_APPS_TWO),
-    BSE(PIN_BSE),
+    APPS1(PIN_APPS_ONE, false),
+    APPS2(PIN_APPS_TWO, false),
+    BSE(PIN_BSE, true),
 
     // Pump control for battery cooling - Unused when EV1 is active
     pump(PIN_PUMP, 0.0, 0.0, 0.0),
 
     pinRTDButton(PIN_RTD_BUTTON, BUTTON_DEBOUNCE_TIME, INPUT),
-    pinSDCTap(PIN_SHUTDOWN_TAP, SHUTDOWN_STABLE_TIME, INPUT),
+    pinSDCTap(PIN_SHUTDOWN_TAP, INPUT, ANALOG_PIN_BUFFER_SIZE),
 
     pinRUN(PIN_RUN, OUTPUT),
-    pinGO(PIN_GO, OUTPUT),
+    pinRFE(PIN_RFE, OUTPUT),
     pinRTDBuzzer(PIN_RTD_SOUND, OUTPUT),
     pinBrakeLight(PIN_BRAKE_LIGHT, OUTPUT),
     pinReset(PIN_RESET, OUTPUT),
@@ -25,6 +25,7 @@ systemData::systemData() :
 
     // EV1.5 additional Teensy pins - Unused when EV1 is active
     pinPump(PIN_PUMP, OUTPUT),
+    pinPumpSwitch(PIN_PUMP_SWITCH, OUTPUT),
     pinFaultLED(PIN_LED_FAULT, OUTPUT)
 {
     // Reset timers
@@ -44,15 +45,29 @@ systemData::systemData() :
 -----------------------------------------------------------------------------*/
 systemFSM::systemFSM() {
     // Assign current state to the reset state (load pedal configuration)
-    // state = &systemFSM::PEDALS;
-
-    state = &systemFSM::INIT;
+    state = &systemFSM::PEDALS;
 }
 
 /*-----------------------------------------------------------------------------
  FSM system constructor
 -----------------------------------------------------------------------------*/
 void systemFSM::ProcessState() {
+    // Get the latest reading on the pedals and SDC tap
+    system.UpdatePedalStructures();
+    system.UpdateSDCTapBuffer();
+
+    // Update the brake light
+    system.ActivateBrakeLight();
+
+    // Determine to run pump based on motor temperature
+    system.RunPump();
+
+    // Check for pedal sensor errors
+    system.Set100msFlag( system.CheckPedalImplausibility() );
+
+    // Update the fault error bits
+    system.SetFaultBuffer( IRQHandler::GetErrorBuffer() );
+
     // Execute the current state the member function pointer points to
     (this->*state)();
 }
@@ -64,7 +79,15 @@ void systemFSM::PEDALS() {
     // Check for a successful load of pedal bounds
     if ( !system.SetPedalBounds() ) {
         DebugErrorPrint("ERROR: PEDAL BOUNDS NOT SET");
-        EXIT;
+
+        // Enable fault LED to indicate error
+        IRQHandler::EnableFaultLEDTimer();
+
+        // Wait for 5 seconds to show error state
+        delay(5000);
+        
+        // Trigger immediate system reset
+        IRQHandler::ResetWDT();
     }
 
     // Assign member function pointer to next state
@@ -88,16 +111,8 @@ void systemFSM::INIT() {
         return;
     }
 
-    // TODO - Temporary for testing
-    system.GetAPPS1().SetPercentRequestLowerBound(0);
-    system.GetAPPS2().SetPercentRequestLowerBound(0);
-    system.GetBSE().SetPercentRequestLowerBound(0);
-    system.GetAPPS1().SetPercentRequestUpperBound(65535);
-    system.GetAPPS2().SetPercentRequestUpperBound(65535);
-    system.GetBSE().SetPercentRequestUpperBound(65535);
-
-    // Activate reset (active low)
-    system.GetResetPin().WriteOutput(LOW);
+    // Disable reset (active low)
+    system.GetResetPin().WriteOutput(HIGH);
 
     DebugPrintln("SHUTDOWN CIRCUIT RESET");
 
@@ -110,23 +125,27 @@ void systemFSM::INIT() {
  PRECHARGE State - Wait for the tractive system to be energized
 -----------------------------------------------------------------------------*/
 void systemFSM::PRECHARGE() {
-    digitalPin & pinSDCTap = system.GetSDCTapPin();
+    // Get shutdown tap pin
+    analogPin pinSDCTap = system.GetSDCTapPin();
 
-    // Set precharge state value to be sent to dashboard
+    // Set the PRECHARGE state value to be sent to dashboard
     system.SetStateBuffer(0);
 
     // Begin pedal calibration when startup detected
-    if ( IRQHandler::GetCalibrationMode() ) {
+    if ( IRQHandler::GetButtonHeld() ) {
         // Reset charge flag
         system.SetChargeTimerFlag(false); 
 
-        state = &systemFSM::CALIBRATE;
-        DebugPrintln("STATE: CALIBRATE");
+        // Use fault LED on ECU to indicate calibration mode
+		IRQHandler::EnableCalibrationTimer();
+
+        state = &systemFSM::CALIBRATE_PEDALS;
+        DebugPrintln("STATE: CALIBRATE PEDALS");
         return;
     }
 
     // Wait until shutdown tap is high
-    if ( !pinSDCTap.ReadDebouncedPin() ) {
+    if ( pinSDCTap.GetBuffer().GetAverage() < SDC_TAP_HIGH ) {
         return;
     }
 
@@ -144,13 +163,6 @@ void systemFSM::PRECHARGE() {
 
     // Set AIR plus pin high
     EV1_AIR_PLUS_HIGH();
-
-    // Set SDC error to be interrupt controlled
-    attachInterrupt(digitalPinToInterrupt( system.GetSDCTapPin().GetPin() ), 
-        ShutdownCircuitISR, FALLING);
-
-    // Remove pedal calibration mode control
-    detachInterrupt( system.GetRTDButtonPin().GetPin() );
     
     // Reset charge flag
     system.SetChargeTimerFlag(false);
@@ -173,16 +185,29 @@ void systemFSM::RTD() {
 
     // Transition to FAULT if any possible error occurs
     if ( system.CheckAllErrors() ) {
-		// Begin toggling fault LED on ECU PCB
+		// Use fault LED on ECU to indicate calibration mode
 		IRQHandler::EnableFaultLEDTimer();
+
+        // Output ECU errors
+        DebugPrintVehicleErrors(system);
 
         state = &systemFSM::FAULT;
         DebugPrintln("STATE: FAULT");
         return;
     }
 
+    // Begin motor calibration when startup detected
+    if ( IRQHandler::GetButtonHeld() ) {
+        // Use fault LED on ECU to indicate calibration mode
+		IRQHandler::EnableCalibrationTimer();
+
+        state = &systemFSM::CALIBRATE_MOTOR;
+        DebugPrintln("STATE: CALIBRATE MOTOR");
+        return;
+    }
+    
     // Await driver input to activate vehicle
-    if ( system.ReadyToDrive() ) {
+    if ( system.ReadyToDrive() && !system.GetBuzzerTimerFlag() ) {
         // Set motor controller enable signals high
         system.ActivateBamocar();
 
@@ -192,6 +217,9 @@ void systemFSM::RTD() {
         // Begin timer for buzzer
         system.SetBuzzerTimer(0);
         system.SetBuzzerTimerFlag(true);
+
+        // Remove calibration controls
+        detachInterrupt( system.GetRTDButtonPin().GetPin() );
     }
 
     // Play buzzer for 1 second and transition to IDLE
@@ -209,8 +237,8 @@ void systemFSM::RTD() {
  IDLE State - Wait for the driver pedal input to drive or brake
 -----------------------------------------------------------------------------*/
 void systemFSM::IDLE() {
-    // CAN_message_t msgTorque;
-    // uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
+    CAN_message_t msgTorque;
+    uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
     // Set the IDLE state value to be sent to dashboard
     system.SetStateBuffer(2);
@@ -219,6 +247,9 @@ void systemFSM::IDLE() {
     if ( system.CheckAllErrors() ) {
 		// Begin toggling fault LED on ECU PCB
 		IRQHandler::EnableFaultLEDTimer();
+
+        // Output ECU errors
+        DebugPrintVehicleErrors(system);
 
         state = &systemFSM::FAULT;
         DebugPrintln("STATE: FAULT");
@@ -241,8 +272,8 @@ void systemFSM::IDLE() {
 
 	// SKIPPING DURING TEST BENCHING
     // Send torque command of zero to Bamocar
-    // PopulateCANMessage(&msgTorque, ID_CAN_MESSAGE_RX, PAR_RX_DLC, torqueBuf, REG_DIG_TORQUE_SET);
-    // SendCANMessage(msgTorque);
+    PopulateCANMessage(&msgTorque, ID_CAN_MESSAGE_RX, PAR_RX_DLC, torqueBuf, REG_DIG_TORQUE_SET);
+    SendCANMessage(msgTorque);
 }
 
 /*-----------------------------------------------------------------------------
@@ -259,6 +290,9 @@ void systemFSM::DRIVE() {
     if ( system.CheckAllErrors() ) {
 		// Begin toggling fault LED on ECU PCB
 		IRQHandler::EnableFaultLEDTimer();
+
+        // Output ECU errors
+        DebugPrintVehicleErrors(system);
 
         state = &systemFSM::FAULT;
         DebugPrintln("STATE: FAULT");
@@ -277,16 +311,16 @@ void systemFSM::DRIVE() {
 
 	// SKIPPING DURING TEST BENCHING
     // Send torque command to Bamocar
-    // PopulateCANMessage(&msgTorque, ID_CAN_MESSAGE_RX, PAR_RX_DLC, torqueBuf, REG_DIG_TORQUE_SET);
-    // SendCANMessage(msgTorque);
+    PopulateCANMessage(&msgTorque, ID_CAN_MESSAGE_RX, PAR_RX_DLC, torqueBuf, REG_DIG_TORQUE_SET);
+    SendCANMessage(msgTorque);
 }
 
 /*-----------------------------------------------------------------------------
  BRAKE State - Apply zero torque to motor and slow down vehicle
 -----------------------------------------------------------------------------*/
 void systemFSM::BRAKE() {
-    // CAN_message_t msgTorque;
-    // uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
+    CAN_message_t msgTorque;
+    uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
     // Set the BRAKE state value to be sent to dashboard
     system.SetStateBuffer(4);
@@ -295,6 +329,9 @@ void systemFSM::BRAKE() {
     if ( system.CheckAllErrors() ) {
 		// Begin toggling fault LED on ECU PCB
 		IRQHandler::EnableFaultLEDTimer();
+
+        // Output ECU errors
+        DebugPrintVehicleErrors(system);
 
         state = &systemFSM::FAULT;
         DebugPrintln("STATE: FAULT");
@@ -310,43 +347,25 @@ void systemFSM::BRAKE() {
 
 	// SKIPPING DURING TEST BENCHING
     // Send torque command of zero to Bamocar
-    // PopulateCANMessage(&msgTorque, ID_CAN_MESSAGE_RX, PAR_RX_DLC, torqueBuf, REG_DIG_TORQUE_SET);
-    // SendCANMessage(msgTorque);
+    PopulateCANMessage(&msgTorque, ID_CAN_MESSAGE_RX, PAR_RX_DLC, torqueBuf, REG_DIG_TORQUE_SET);
+    SendCANMessage(msgTorque);
 }
 
 /*-----------------------------------------------------------------------------
  FAULT State - Shut off power to the motor when an error occurs
 -----------------------------------------------------------------------------*/
 void systemFSM::FAULT() {
-    // static bool bErrorsWritten = false;
+    // Get the shutdown tap pin
+    analogPin pinSDCTap = system.GetSDCTapPin();
 
-    digitalPin & pinSDCTap = system.GetSDCTapPin();
-
-    // Update the fault error bits
-    system.SetFaultBuffer( IRQHandler::GetErrorBuffer() );
+    // Get the bit field of errors
     uint8_t faultBuf = system.GetFaultBuffer();
 
     // Set the FAULT state value to be sent to dashboard
     system.SetStateBuffer(5);
-    
-    // Print which errors occurred (binary format) (OOR, BPP, DIS, SDC)
-    DebugPrint("VEHICLE ERRORS: ");
-    DebugPrint( bitRead(faultBuf, ERROR_CODE_OOR) );
-    DebugPrint( bitRead(faultBuf, ERROR_CODE_APPS_BSE) );
-    DebugPrint( bitRead(faultBuf, ERROR_CODE_DISAGREE) );
-    DebugPrintln( bitRead(faultBuf, ERROR_CODE_SHUTDOWN) );
 
     // Disable power to motor controller 
     system.DeactivateBamocar();
-
-	// SKIPPING DURING TEST BENCHING
-    // Write ECU errors to a data file on the SD card
-    // if (!bErrorsWritten) {
-    //     ErrorToSD();
-        
-    //     // Set flag high to only write once
-    //     bErrorsWritten = true;
-    // }
 
     // System cannot be re-activated if the pedal sensors disagree or are out of range
     if ( PedalsDisagree() || PedalsOOR() ) {
@@ -364,8 +383,6 @@ void systemFSM::FAULT() {
         // Disable fault LED on ECU PCB when leaving FAULT state
         IRQHandler::DisableFaultLEDTimer();
 
-        // bErrorsWritten = false;
-
         // Revert to IDLE state
         state = &systemFSM::IDLE;
         DebugPrintln("STATE: IDLE");
@@ -373,15 +390,13 @@ void systemFSM::FAULT() {
     }
 
     // Check shutdown tap closes again
-    if ( ShutdownCircuitOpen() && pinSDCTap.ReadDebouncedPin() ) {
+    if ( ShutdownCircuitOpen() && pinSDCTap.GetBuffer().GetAverage() >= SDC_TAP_HIGH ) {
         // Clear shutdown open error bit
         IRQHandler::SetErrorBuffer( faultBuf & ~(1 << ERROR_CODE_SHUTDOWN) );
         IRQHandler::SetShutdownState(false);
 
         // Disable fault LED on ECU PCB when leaving FAULT state
         IRQHandler::DisableFaultLEDTimer();
-
-        // bErrorsWritten = false;
 
         // Revert to RTD state
         state = &systemFSM::RTD;
@@ -391,13 +406,13 @@ void systemFSM::FAULT() {
 }
 
 /*-----------------------------------------------------------------------------
- CALIBRATE State - Re-configure pedal sensors
+ CALIBRATE PEDALS State - Re-configure pedal sensors
 -----------------------------------------------------------------------------*/
-void systemFSM::CALIBRATE() {
-	DebugPrintln("BEGINNING CALIBARTION...");
+void systemFSM::CALIBRATE_PEDALS() {
+	DebugPrintln("BEGINNING PEDAL CALIBARTION...");
 
     // Get the RTD button pin
-    digitalPin & pinRTDButton = system.GetRTDButtonPin();
+    digitalPin pinRTDButton = system.GetRTDButtonPin();
 
     // Disable RTD button interrupt during pedal calibration
     detachInterrupt( pinRTDButton.GetPin() );
@@ -406,12 +421,53 @@ void systemFSM::CALIBRATE() {
     system.CalibratePedals();
 
     // Set calibration mode flag low
-    IRQHandler::SetCalibrationMode(false);
+    IRQHandler::SetButtonHeld(false);
+
+    // Disable fault LED serving as calibration mode indicator
+    IRQHandler::DisableCalibrationTimer();
 
     // Set RTD button pin to be interrupt controlled for pedal calibration
-    attachInterrupt(digitalPinToInterrupt( pinRTDButton.GetPin() ), PedalCalibrationISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt( pinRTDButton.GetPin() ), RTDButtonISR, CHANGE);
+
+    DebugPrint("APPS1 Lower Bound: "); DebugPrintln( system.GetAPPS1().GetPercentRequestLowerBound() );
+    DebugPrint("APPS1 Upper Bound: "); DebugPrintln( system.GetAPPS1().GetPercentRequestUpperBound() );
+
+    DebugPrint("APPS2 Lower Bound: "); DebugPrintln( system.GetAPPS2().GetPercentRequestLowerBound() );
+    DebugPrint("APPS2 Upper Bound: "); DebugPrintln( system.GetAPPS2().GetPercentRequestUpperBound() );
+
+    DebugPrint("BSE Lower Bound: "); DebugPrintln( system.GetBSE().GetPercentRequestLowerBound() );
+    DebugPrint("BSE Upper Bound: "); DebugPrintln( system.GetBSE().GetPercentRequestUpperBound() );
 
     // Transition back to PEDALS to read in new encoded values
     state = &systemFSM::PEDALS;
     DebugPrintln("STATE: PEDALS");
+}
+
+/*-----------------------------------------------------------------------------
+ CALIBRATE MOTOR State - Calibrate motor with Bamocar
+-----------------------------------------------------------------------------*/
+void systemFSM::CALIBRATE_MOTOR() {
+    DebugPrintln("BEGINNING MOTOR CALIBARTION...");
+
+    // Get the RTD button pin
+    digitalPin pinRTDButton = system.GetRTDButtonPin();
+
+    // Disable RTD button interrupt during pedal calibration
+    detachInterrupt( pinRTDButton.GetPin() );
+
+    // Begin calibration
+    system.CalibrateMotor();
+
+    // Set calibration mode flag low
+    IRQHandler::SetButtonHeld(false);
+
+    // Disable fault LED serving as calibration mode indicator
+    IRQHandler::DisableCalibrationTimer();
+
+    // Set RTD button pin to be interrupt controlled for pedal calibration
+    attachInterrupt(digitalPinToInterrupt( pinRTDButton.GetPin() ), RTDButtonISR, CHANGE);
+
+     // Transition back to RTD for driving
+    state = &systemFSM::RTD;
+    DebugPrintln("STATE: RTD");
 }

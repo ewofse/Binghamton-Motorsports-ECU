@@ -8,10 +8,13 @@ void systemData::CalibratePedals() {
 	uint16_t boundAPPS2 = 0;
 	uint16_t boundBSE = 0;
 
-	calibrate_t FSM_State = UPDATE_PEDALS;
-	uint8_t stateCounter = 0;
+	pedalCalibrate state = pedalCalibrate::UPDATE_PEDALS;
+	uint8_t buttonCounter = 0;
 	bool bDone = false;
 	char strPedalData[50] = "";
+
+	// Turn off brake light
+	pinBrakeLight.WriteOutput(LOW);
 	
 	// Blocking operation - Nothing on the car should be active during calibration
 	while (!bDone) {
@@ -19,23 +22,24 @@ void systemData::CalibratePedals() {
 		IRQHandler::FeedWDT();
 
 		// Pedal Calibration FSM
-		switch (FSM_State) {
+		switch (state) {
 			/*-----------------------------------------------------------------------------
 			 Update Pedal Sensor Readings
 			-----------------------------------------------------------------------------*/
-			case (UPDATE_PEDALS):
+			case (pedalCalibrate::UPDATE_PEDALS):
+				// Continuously update pedal readings until button pressed
 				UpdatePedalStructures();
 
 				// Await driver RTD button input to set bounds
 				if ( pinRTDButton.ReadPulsedPin( pinRTDButton.ReadDebouncedPin() ) ) {
 					// Increment state counter
-					++stateCounter;
+					++buttonCounter;
 
 					// Move to next state based on how many times RTD button is pressed
-					if (stateCounter == 1) {
-						FSM_State = PERCENT_REQ_UPPER;
-					} else if (stateCounter == 2) {
-						FSM_State = PERCENT_REQ_LOWER;
+					if (buttonCounter == 1) {
+						state = pedalCalibrate::PERCENT_REQ_UPPER;
+					} else if (buttonCounter == 2) {
+						state = pedalCalibrate::PERCENT_REQ_LOWER;
 					}
 				}
 
@@ -44,7 +48,7 @@ void systemData::CalibratePedals() {
 			/*-----------------------------------------------------------------------------
 			 Set the Upper Bounds for Pedal Percent Requests
 			-----------------------------------------------------------------------------*/
-			case (PERCENT_REQ_UPPER): {
+			case (pedalCalibrate::PERCENT_REQ_UPPER): {
 				char strUpperBounds[25] = "";
 
 				// Set upper bounds
@@ -58,10 +62,10 @@ void systemData::CalibratePedals() {
 				BSE.SetPercentRequestUpperBound(boundBSE);
 
 				// Add pedal bound values to the string
-				sprintf(strUpperBounds, "%d,%d,%d,", boundAPPS1, boundAPPS2, boundBSE);
-				strcat(strPedalData, strUpperBounds);
+				snprintf(strUpperBounds, 25, "%d,%d,%d,", boundAPPS1, boundAPPS2, boundBSE);
+				strncat(strPedalData, strUpperBounds, 50 - strlen(strPedalData) - 1);
 
-				FSM_State = UPDATE_PEDALS;
+				state = pedalCalibrate::UPDATE_PEDALS;
 
 				DebugPrintln("UPPER BOUND CALIBRATED");
 
@@ -71,7 +75,7 @@ void systemData::CalibratePedals() {
 			/*-----------------------------------------------------------------------------
 			 Set the Lower Bounds for Pedal Percent Requests
 			-----------------------------------------------------------------------------*/
-			case (PERCENT_REQ_LOWER): {
+			case (pedalCalibrate::PERCENT_REQ_LOWER): {
 				char strLowerBounds[25] = "";
 
 				// Set upper bounds
@@ -85,10 +89,10 @@ void systemData::CalibratePedals() {
 				BSE.SetPercentRequestLowerBound(boundBSE);
 
 				// Add pedal bound values to the string
-				sprintf(strLowerBounds, "%d,%d,%d", boundAPPS1, boundAPPS2, boundBSE);
-				strcat(strPedalData, strLowerBounds);
+				snprintf(strLowerBounds, 25, "%d,%d,%d", boundAPPS1, boundAPPS2, boundBSE);
+				strncat(strPedalData, strLowerBounds, 50 - strlen(strPedalData) - 1);
 
-				FSM_State = DONE;
+				state = pedalCalibrate::DONE;
 
 				DebugPrintln("LOWER BOUND CALIBRATED");
 			}
@@ -96,7 +100,7 @@ void systemData::CalibratePedals() {
 			/*-----------------------------------------------------------------------------
 			 Output the bounds before ending calibration
 			-----------------------------------------------------------------------------*/
-			case (DONE): {
+			case (pedalCalibrate::DONE): {
 				// Update SD file with new data
 				WriteDataToFile(FILE_PEDAL_BOUNDS, strPedalData, OVERWRITE);
 
@@ -105,6 +109,63 @@ void systemData::CalibratePedals() {
 
 				DebugPrintln("CALIBRATION COMPLETE");
 			}
+
+			/*-----------------------------------------------------------------------------
+			 Uknown State
+			-----------------------------------------------------------------------------*/
+			default:
+				// Drive system to done state
+				state = pedalCalibrate::DONE;
+				break;
 		}
 	}
+
+	// Add a small delay to prevent double button press
+	delay(100);
+}
+
+/*-----------------------------------------------------------------------------
+ Initiate Bamocar calibration sequence
+-----------------------------------------------------------------------------*/
+void systemData::CalibrateMotor() {
+	bool bDone = false;
+	uint8_t buttonCounter = 0;
+
+	// Blocking operation - Nothing on the car should be active during calibration
+	while (!bDone) {
+		// Feed Watchdog
+		IRQHandler::FeedWDT();
+
+		// Wait until RTD button is pressed
+		if ( pinRTDButton.ReadPulsedPin( pinRTDButton.ReadDebouncedPin() ) ) {
+			// Increment button counter
+			++buttonCounter;
+
+			// Evaluate button count value and transition to next state
+			if (buttonCounter == 1) {
+				// Enable the RFE signal
+				pinRFE.WriteOutput(HIGH);
+				DebugPrintln("RFE HIGH");
+			} else if (buttonCounter == 2) {
+				// Enable the run signal
+				pinRUN.WriteOutput(HIGH);
+				DebugPrintln("RUN HIGH");
+			} else if (buttonCounter == 3) {
+				// Turn off the run signal
+				pinRUN.WriteOutput(LOW);
+				DebugPrintln("RUN LOW");
+			} else if (buttonCounter == 4) {
+				// Turn off the RFE signal
+				pinRFE.WriteOutput(LOW);
+			
+				// Exit calibration
+				bDone = true;
+
+				DebugPrintln("CALIBRATION COMPLETE");
+			}
+		}
+	}
+
+	// Add a small delay to prevent double button press
+	delay(100);
 }

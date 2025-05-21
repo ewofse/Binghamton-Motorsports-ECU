@@ -34,11 +34,12 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 ------------------------------------------*/
 #define REG_DIG_SPEED_SET    	 0x31
 #define REG_DIG_TORQUE_SET   	 0x90
-#define REG_SPEED_ACTUAL     	 0x30 
+#define REG_SPEED_ACTUAL     	 0x30
+#define REG_SPEED_FILTERED       0xA8
+#define REG_SPEED_NOMINAL        0x59
 #define REG_MOTOR_TEMP           0x49
 #define REG_BAMOCAR_TEMP         0x4A
 #define REG_READ             	 0x3D
-#define REG_RPM              	 0xA8
 #define REG_VOLTAGE          	 0x8A
 #define REG_CURRENT          	 0x5F
 #define REG_CURRENT_PHASE_1  	 0x54
@@ -77,12 +78,12 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 #define STATUS_MESSAGE_INTERVAL	 50
 #define NUM_MESSAGES_TX		 	 6
 
-#define PACK_THRESHOLD           60
-
 /*-------------------------------------------------------------------------------------------------
  Prototypes
 -------------------------------------------------------------------------------------------------*/
 void ConfigureCANBus();
+
+void PrintCANMessage(const CAN_message_t & message);
 
 void ProcessCANMessage(const CAN_message_t & message);
 

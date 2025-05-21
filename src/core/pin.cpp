@@ -44,7 +44,16 @@ digitalPin::digitalPin(const uint8_t pinValue, bool bPinMode) :
 -----------------------------------------------------------------------------*/
 analogPin::analogPin(const uint8_t pinValue, bool bPinMode) :
 	// Initialize a GPIO pin with a specified pin value and mode
-	GPIO {pinValue, bPinMode} {}
+	GPIO {pinValue, bPinMode},
+	buffer( (size_t) 0 ) {}
+
+/*-----------------------------------------------------------------------------
+ Analog pin constructor with a circular buffer
+-----------------------------------------------------------------------------*/
+analogPin::analogPin(const uint8_t pinValue, bool bPinMode, size_t size) :
+	// Initialize a GPIO pin with a specified pin value and mode
+	GPIO {pinValue, bPinMode},
+	buffer(size) {}
 
 /*-----------------------------------------------------------------------------
  Debounce the incoming signal into the pin

@@ -22,6 +22,20 @@ void systemData::UpdatePedalStructures() {
     BSE.UpdatePedalData();
 }
 
+/*----------------------------------------------------------------------------- 
+ Sample the SDC tap
+-----------------------------------------------------------------------------*/
+void systemData::UpdateSDCTapBuffer() {
+    // Get the signal buffer
+    circularBuffer buffer = pinSDCTap.GetBuffer();
+
+    // Get the latest pin reading and add to buffer
+    buffer.PushBuffer( pinSDCTap.ReadRawPinAnalog() );
+
+    // Set the SDC tap buffer
+    pinSDCTap.SetBuffer(buffer);
+}
+
 /*-----------------------------------------------------------------------------
  Check OOR & signal agreement - Returns true if error lasts for over 100 ms
 -----------------------------------------------------------------------------*/
@@ -70,7 +84,7 @@ bool systemData::ReadyToDrive() {
 void systemData::ActivateBamocar() {
 	// Digital parameters required by the motor controller to drive
 	pinRUN.WriteOutput(HIGH);
-	pinGO.WriteOutput(HIGH);
+	pinRFE.WriteOutput(HIGH);
 }
 
 /*-----------------------------------------------------------------------------
@@ -79,7 +93,7 @@ void systemData::ActivateBamocar() {
 void systemData::DeactivateBamocar() {
 	// Digital parameters required by the motor controller to drive
 	pinRUN.WriteOutput(LOW);
-	pinGO.WriteOutput(LOW);
+	pinRFE.WriteOutput(LOW);
 }
 
 /*----------------------------------------------------------------------------- 
@@ -152,7 +166,9 @@ bool systemData::CheckAllErrors() {
     uint8_t errors = IRQHandler::GetErrorBuffer();
 
     // Check if the shutdown circuit opened
-    if ( IRQHandler::GetShutdownState() ) {
+    if ( pinSDCTap.GetBuffer().GetAverage() < SDC_TAP_HIGH ) {
+        // Set the SDC error bit high
+        IRQHandler::SetErrorBuffer( errors | (1 << ERROR_CODE_SHUTDOWN) );
         bResult = true;
 
         DebugPrintln("ERROR: SHUTDOWN CIRCUIT OPENED");
@@ -195,26 +211,37 @@ bool systemData::SetPedalBounds() {
     bool bSuccessfulLoad = false;
     size_t bufferLength;
 
+    // Obtain the pedal sensors
+    hall * sensors[NUM_SENSORS] = {&APPS1, &APPS2, &BSE};
+
     // Open file in SD card
     File fPedalBounds = SD.open(FILE_PEDAL_BOUNDS, FILE_READ);
 
     // Check file has opened
     if (fPedalBounds) {
         // Read sensor data and convert to array of integers
-        const char * strPedalBounds = fPedalBounds.readString().c_str();
+        String pedalBoundString = fPedalBounds.readString();
+        const char * strPedalBounds = pedalBoundString.c_str();
         uint16_t * pPedalBounds = SplitIntegerString(strPedalBounds, DELIMITER, bufferLength);
 
         // Check number of values read matches number of bounds for sensors
         if (pPedalBounds && bufferLength == 2 * NUM_SENSORS) {
-            // Set upper bounds for percent request
-            APPS1.SetPercentRequestUpperBound( pPedalBounds[0] );
-            APPS2.SetPercentRequestUpperBound( pPedalBounds[1] );
-            BSE.SetPercentRequestUpperBound( pPedalBounds[2] );
+            // Iterate through each set of bounds per sensor
+            for (uint8_t index = 0; index < NUM_SENSORS; ++index) {
+                // Determine if the sensor voltage increases with actuation
+                bool bVoltageInverted = sensors[index]->GetVoltageInverted();
 
-            // Set lower bounds for percent request (add a tolerance)
-            APPS1.SetPercentRequestLowerBound( (uint16_t) pPedalBounds[3] * 0.97 );
-            APPS1.SetPercentRequestLowerBound( (uint16_t) pPedalBounds[4] * 0.97 );
-            BSE.SetPercentRequestLowerBound( (uint16_t) pPedalBounds[5] * 0.97 );
+                // Use direct or swapped bounds based on inversion
+                uint16_t upper = bVoltageInverted ? pPedalBounds[index + NUM_SENSORS] : pPedalBounds[index];
+                uint16_t lower = bVoltageInverted ? pPedalBounds[index] : pPedalBounds[index + NUM_SENSORS];
+
+                // Apply tolerance to lower bound
+                lower = static_cast<uint16_t>(lower * 0.97);
+
+                // Set the bounds
+                sensors[index]->SetPercentRequestUpperBound(upper);
+                sensors[index]->SetPercentRequestLowerBound(lower);
+            }
 
             bSuccessfulLoad = true;
 
@@ -222,12 +249,90 @@ bool systemData::SetPedalBounds() {
         }
 
         // Free buffer from memory
-        free(pPedalBounds);
-        pPedalBounds = NULL;
+        if (pPedalBounds) {
+            free(pPedalBounds);
+            pPedalBounds = NULL;
+        }
 
         // Close the file
         fPedalBounds.close();
     }
 
     return bSuccessfulLoad;
+}
+
+/*-----------------------------------------------------------------------------
+ Slowly ramp up or ramp down the duty cycle for the pump when in use
+-----------------------------------------------------------------------------*/
+void systemData::RampPump(bool direction) {
+    // Get the time the function first executes
+    static uint32_t rampTime = millis();
+
+    // Check if 100 milliseconds has passed
+    if ( millis() - rampTime >= 100 ) {
+        // Reset timer
+        rampTime = millis();
+
+        // Increase or decrease duty cycle based on direction
+        if (direction) {
+            // Increment duty cycle by 5%
+            pump.SetPWMDutyCycle( pump.GetPWMDutyCycle() + 5 );
+        } else if ( pump.GetPWMDutyCycle() ) {
+            // Decrement duty cycle by 5%
+            pump.SetPWMDutyCycle( pump.GetPWMDutyCycle() - 5 );
+        }
+    }
+
+    // Cap the duty cycle at 100%
+    if ( pump.GetPWMDutyCycle() > 100 ) {
+        pump.SetPWMDutyCycle(100);
+    }
+}
+
+/*-----------------------------------------------------------------------------
+ Turn pump on using precharge circuitry
+-----------------------------------------------------------------------------*/
+void systemData::RunPump() {
+    static uint32_t prechargeTimer = millis();
+    static bool bPumpActivated = false;
+
+    // Check if pump has not been activated and motor temperature is high
+    if ( !bPumpActivated && IRQHandler::GetMotorTemperature() > 40 ) {
+        // Initially turn on pin driving pump through precharge resistor
+        pinPump.WriteOutput(HIGH);
+
+        // Check if 500 ms has passed
+        if ( millis() - prechargeTimer >= 500 ) {
+            // Switch the relay on to allow full current to pump
+            pinPumpSwitch.WriteOutput(HIGH);
+
+            // Turn off initial precharge pathway
+            pinPump.WriteOutput(LOW);
+
+            // Mark pump as activated
+            bPumpActivated = true;
+        }
+    } else if ( bPumpActivated && IRQHandler::GetMotorTemperature() < 20 ) {
+        // Turn off the pump
+        pinPump.WriteOutput(LOW);
+        pinPumpSwitch.WriteOutput(LOW);
+
+        // Mark pump as decativated
+        bPumpActivated = false;
+    }
+}
+
+/*-----------------------------------------------------------------------------
+ Output what errors occurred during a fault condition
+-----------------------------------------------------------------------------*/
+void systemData::DebugPrintErrors() {
+    // Set the fault buffer from interrupt error buffer
+    faultBuf = IRQHandler::GetErrorBuffer();
+
+    // Print which errors occurred (binary format) (OOR, BPP, DIS, SDC)
+    DebugPrint("VEHICLE ERRORS: ");
+    DebugPrint( bitRead(faultBuf, ERROR_CODE_OOR) );
+    DebugPrint( bitRead(faultBuf, ERROR_CODE_APPS_BSE) );
+    DebugPrint( bitRead(faultBuf, ERROR_CODE_DISAGREE) );
+    DebugPrintln( bitRead(faultBuf, ERROR_CODE_SHUTDOWN) );
 }

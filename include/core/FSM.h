@@ -35,9 +35,10 @@ class systemData {
         bool Get100msFlag() { return timers.b100msPassed; }
 
         digitalPin & GetRTDButtonPin() { return pinRTDButton; }
-        digitalPin & GetSDCTapPin() { return pinSDCTap; }
+        analogPin & GetSDCTapPin() { return pinSDCTap; }
+
         digitalPin GetRUNPin() { return pinRUN; }
-        digitalPin GetGOPin() { return pinGO; }
+        digitalPin GetGOPin() { return pinRFE; }
         digitalPin GetRTDBuzzerPin() { return pinRTDBuzzer; }
         digitalPin GetBrakeLightPin() { return pinBrakeLight; }
         digitalPin GetResetPin() { return pinReset; }
@@ -45,6 +46,7 @@ class systemData {
         digitalPin GetAIRPlusPin() { return pinAIRPlus; }
 
         digitalPin GetPumpPin() { return pinPump; }
+        digitalPin GetPumpSwitchPin() { return pinPumpSwitch; }
         digitalPin GetFaultLEDPin() { return pinFaultLED; }
 
         uint8_t GetStateBuffer() { return stateBuf; }
@@ -82,6 +84,8 @@ class systemData {
 
         void UpdatePedalStructures();
 
+        void UpdateSDCTapBuffer();
+
         float GetLowerPercentAPPS();
 
         bool CheckAPPS();
@@ -98,6 +102,14 @@ class systemData {
 
         void CalibratePedals();
 
+        void CalibrateMotor();
+
+        void RampPump(bool direction);
+
+        void RunPump();
+
+        void DebugPrintErrors();
+
     private:
         // Hall sensor objects
         hall APPS1;
@@ -112,10 +124,10 @@ class systemData {
 
         // GPIO Pins
         digitalPin pinRTDButton;
-        digitalPin pinSDCTap;
+        analogPin pinSDCTap;
 
         digitalPin pinRUN;
-        digitalPin pinGO;
+        digitalPin pinRFE;
         digitalPin pinRTDBuzzer;
         digitalPin pinBrakeLight;
         digitalPin pinReset;
@@ -125,6 +137,7 @@ class systemData {
 
         // EV1.5 specific pins
         digitalPin pinPump;
+        digitalPin pinPumpSwitch;
         digitalPin pinFaultLED;
 
         uint8_t stateBuf;
@@ -155,7 +168,8 @@ class systemFSM {
         void DRIVE();
         void BRAKE();
         void FAULT();
-        void CALIBRATE();
+        void CALIBRATE_PEDALS();
+        void CALIBRATE_MOTOR();
 
         // All data modified and used within system
         systemData system;

@@ -27,33 +27,36 @@ void ConfigureCANBus() {
 }
 
 /*-----------------------------------------------------------------------------
- Read a CAN message using interrupts (FIFO)
+ Output the contents of a CAN message
 -----------------------------------------------------------------------------*/
-void ProcessCANMessage(const CAN_message_t & message) {
-	CAN_message_t messageCopy = message;
-	uint8_t batteryTemperature = 0;
-
+void PrintCANMessage(const CAN_message_t & message) {
 	// Print the message ID and DLC
 	DebugPrint("ID: 0x"); DebugPrintHEX(message.id);
 	DebugPrint(" LEN: "); DebugPrint(message.len);
 	DebugPrint(" DATA: ");
 
 	// Print the message data buffer
-	for (int i = 0; i < message.len; ++i) {
-		DebugPrintHEX(message.buf[i]);
+	for (uint8_t index = 0; index < message.len; ++index) {
+		DebugPrintHEX( message.buf[index] );
 		DebugPrint(" ");
 	}
+
+	DebugPrintln();
+}
+
+/*-----------------------------------------------------------------------------
+ Read a CAN message using interrupts (messages held in FIFO buffer)
+-----------------------------------------------------------------------------*/
+void ProcessCANMessage(const CAN_message_t & message) {
+	CAN_message_t messageCopy = message;
+
+	// Output CAN message contents
+	DebugPrintCANMessage(message);
 	
-	// Check the message is from the Bamocar or Orion BMS
+	// Check the message is from the Bamocar and contains dashboard data
 	if ( message.id == ID_CAN_MESSAGE_TX && MapCANMessage(messageCopy) ) {
 		// Send the data to the dashboard
 		SendCANMessage(messageCopy);
-	} else if (message.id == ID_BATTERY_TEMP) {
-		// Read the (highest) battery pack temperature
-		batteryTemperature = message.buf[0];
-
-		// Store battery temperature for PID controls
-		IRQHandler::SetBatteryTemperature(batteryTemperature);
 	}
 }
 
@@ -67,7 +70,7 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC,
 	pMessage->flags.remote    =  PAR_REMOTE;
 	pMessage->flags.overrun   =  PAR_OVERRUN;
 	pMessage->flags.reserved  =  PAR_RESERVED;
-	pMessage->id              =  ID;
+	pMessage->id              =  static_cast<uint32_t>(ID);
 	pMessage->len             =  DLC;
 
 	pMessage->buf[0] = bamocarDestReg;
@@ -87,7 +90,7 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint
 	pMessage->flags.remote    =  PAR_REMOTE;
 	pMessage->flags.overrun   =  PAR_OVERRUN;
 	pMessage->flags.reserved  =  PAR_RESERVED;
-	pMessage->id              =  ID;
+	pMessage->id              =  static_cast<uint32_t>(ID);
 	pMessage->len             =  DLC;
 
 	// Bamocar read register request - See CAN Complete
@@ -109,7 +112,7 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint
 	pMessage->flags.remote    =  PAR_REMOTE;
 	pMessage->flags.overrun   =  PAR_OVERRUN;
 	pMessage->flags.reserved  =  PAR_RESERVED;
-	pMessage->id              =  ID;
+	pMessage->id              =  static_cast<uint32_t>(ID);
 	pMessage->len             =  DLC;
 
 	// Bamocar read register request - See CAN Complete
@@ -131,7 +134,7 @@ void PopulateCANMessage(CAN_message_t * pMessage, uint16_t ID, uint8_t DLC, uint
 	pMessage->flags.remote    =  PAR_REMOTE;
 	pMessage->flags.overrun   =  PAR_OVERRUN;
 	pMessage->flags.reserved  =  PAR_RESERVED;
-	pMessage->id              =  ID;
+	pMessage->id              =  static_cast<uint32_t>(ID);
 	pMessage->len             =  DLC;
 
 	// Populate buffer for custom message (error, state, etc.)
@@ -150,11 +153,15 @@ bool MapCANMessage(CAN_message_t & message) {
 	switch ( message.buf[0] ) {
 		// Motor temperature
 		case (REG_MOTOR_TEMP):
+			// Set the motor temperature 
+			// TODO - get conversion rate from pi software
+			IRQHandler::SetMotorTemperature(0);
+
 			message.id = ID_TEMP;
 			break;
 
 		// Motor RPM
-		case (REG_SPEED_ACTUAL):
+		case (REG_SPEED_FILTERED):
 			message.id = ID_SPEED;
 			break;
 
@@ -180,7 +187,7 @@ void SendCANMessage(const CAN_message_t & message) {
 -----------------------------------------------------------------------------*/
 void SendCANMessage(const CAN_message_t & message, const FLEXCAN_MAILBOX MB) {
 	myCan.write(MB, message);
-	// DebugPrintln("MESSAGE SENT");
+	DebugPrintln("MESSAGE SENT");
 }
 
 /*-----------------------------------------------------------------------------
@@ -221,15 +228,15 @@ void RequestBamocarData() {
 	SendCANMessage(msgBamocarRequest);
 
 	// Overall current
-	msgBamocarRequest.buf[1] = REG_CURRENT;
-	SendCANMessage(msgBamocarRequest);
+	// msgBamocarRequest.buf[1] = REG_CURRENT;
+	// SendCANMessage(msgBamocarRequest);
 
 	// Overall voltage
-	msgBamocarRequest.buf[1] = REG_VOLTAGE;
-	SendCANMessage(msgBamocarRequest);
+	// msgBamocarRequest.buf[1] = REG_VOLTAGE;
+	// SendCANMessage(msgBamocarRequest);
 	
 	// Motor RPM
-	msgBamocarRequest.buf[1] = REG_SPEED_ACTUAL;
+	msgBamocarRequest.buf[1] = REG_SPEED_FILTERED;
 	SendCANMessage(msgBamocarRequest);
 
 	// Phase current

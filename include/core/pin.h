@@ -6,21 +6,25 @@
  Libraries
 -------------------------------------------------------------------------------------------------*/
 #include "general.h"
+#include "sensors/buffer.h"
 
 /*------------------------------------------
  Macros - Pins
 ------------------------------------------*/
 #ifdef EV1_5
     #define PIN_BSE              A16
-    #define PIN_APPS_ONE         A15
-    #define PIN_APPS_TWO         A14 
+    #define PIN_APPS_ONE         A14
+    #define PIN_APPS_TWO         A15 
 
     #define PIN_RTD_BUTTON       9
-    #define PIN_SHUTDOWN_TAP     8
+
+    #define PIN_SHUTDOWN_TAP     A1
+
     #define PIN_RESET            35
     #define PIN_RUN              13
-    #define PIN_GO               17
+    #define PIN_RFE              17
     #define PIN_BRAKE_LIGHT      33
+    #define PIN_PUMP_SWITCH      29
 #elif defined(EV1)
     #define PIN_BSE              A10 // Left
     #define PIN_APPS_ONE         A13 // Second Right
@@ -30,7 +34,7 @@
     #define PIN_SHUTDOWN_TAP     12
     #define PIN_RESET            18
     #define PIN_RUN              21
-    #define PIN_GO               22
+    #define PIN_RFE              22
     #define PIN_BRAKE_LIGHT      19
 #endif
 
@@ -66,6 +70,17 @@
 #else
 	#define EV1_5_TOGGLE_FAULT_LED()
     #define EV1_5_PUMP_CONTROL()
+#endif
+
+/*------------------------------------------
+ Macros - Shutdown Circuit Tap Control
+------------------------------------------*/
+#ifdef ANALOG
+#else
+#endif
+
+#ifdef DIGITAL
+#else
 #endif
 
 /*-------------------------------------------------------------------------------------------------
@@ -118,10 +133,21 @@ class analogPin : public GPIO {
     public:
         // Constructor
         analogPin(const uint8_t pinValue, bool bPinMode);
+        analogPin(const uint8_t pinValue, bool bPinMode, size_t size);
+
+        // Getters
+        circularBuffer GetBuffer() { return buffer; }
+
+        // Setters
+        void SetBuffer(circularBuffer data) { buffer = data; }
 
         // Data methods
-        void SetOutput(uint16_t value) { analogWrite(pin, value); }
+        void SetOutput(uint8_t value) { analogWrite(pin, value); }
         uint16_t ReadRawPinAnalog() { return analogRead(pin); }
+    
+    private:
+        // Circular buffer to average signal
+        circularBuffer buffer;
 };
 
 // End safe guards

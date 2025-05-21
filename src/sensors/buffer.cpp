@@ -4,49 +4,66 @@
  Circular buffer construtor
 -----------------------------------------------------------------------------*/
 circularBuffer::circularBuffer(const size_t elements) {
-    // Declare memory for buffer and set head and tail start and end
-    pBuffer = (uint16_t *) calloc( elements, sizeof(uint16_t) );
-    pHead = pBuffer + elements - 1;
-    pTail = pBuffer;
+    // Check there are a non-zero number of elements
+    if (elements > 0) {
+        // Declare memory for buffer and set head and tail start and end
+        pBuffer = static_cast<uint16_t *>( calloc( elements, sizeof(uint16_t) ) );
+        pHead = pBuffer + elements - 1;
+        pTail = pBuffer;
 
-    // Initialize sum of buffer & number of elements
-    total = 0;
-    count = 0;
-    capacity = elements;
+        // Initialize sum of buffer & number of elements
+        total = 0;
+        count = 0;
+        capacity = elements;
+    } else {
+        // Set all pointes to NULL
+        pBuffer = NULL;
+        pHead = NULL;
+        pTail = NULL;
+
+        // Set all counters to zero
+        total = 0;
+        count = 0;
+        capacity = 0;
+    }
 }
 
 /*-----------------------------------------------------------------------------
  Add element to circular buffer
 -----------------------------------------------------------------------------*/
 void circularBuffer::PushBuffer(uint16_t value) {
-    // Subtract old value from total sum
-    total -= *pHead;
+    // Check the buffer and capacity were initizlied
+    if (pBuffer && capacity > 0) {
+        // Subtract old value from total sum
+        total -= *pHead;
 
-    // Store inputted data into current buffer head
-    *pHead = value;
+        // Store inputted data into current buffer head
+        *pHead = value;
 
-    // Add new value to total sum
-    total += *pHead;
-
-    // Wrap around when reaching the end of buffer
-    if (pHead == pBuffer + capacity) {
-        pHead = pBuffer;
-    }
-
-    // Advance the head to the next element
-    ++pHead;
-
-    // Update current element counter and tail
-    if (count == capacity) {
-        // Advance the tail to the next element
-        ++pTail;
+        // Add new value to total sum
+        total += *pHead;
 
         // Wrap around when reaching the end of buffer
-        if (pTail == pBuffer + capacity) {
-            pTail = pBuffer;
+        if (pHead == pBuffer + capacity) {
+            pHead = pBuffer;
         }
-    } else {
-        ++count;
+
+        // Advance the head to the next element
+        ++pHead;
+
+        // Update current element counter and tail
+        if (count == capacity) {
+            // Advance the tail to the next element
+            ++pTail;
+
+            // Wrap around when reaching the end of buffer
+            if (pTail == pBuffer + capacity) {
+                pTail = pBuffer;
+            }
+        } else {
+            // Increment the element count
+            ++count;
+        }
     }
 }
 
@@ -54,17 +71,35 @@ void circularBuffer::PushBuffer(uint16_t value) {
  Obtain an element from circular buffer
 -----------------------------------------------------------------------------*/
 uint16_t circularBuffer::PullBuffer() {
-    // Return the value at the head of buffer if the head is valid
-    return (pHead >= pBuffer) && (pHead < pBuffer + count - 1) ? *pHead : 0;
+    uint16_t value = 0;
+
+    // Check the buffer was initialized
+    if (pBuffer) {
+        // Obtain the value at the head of buffer if the head is valid
+        value = (pHead >= pBuffer) && (pHead < pBuffer + count - 1) ? *pHead : 0;
+    }
+    
+    return value;
+}
+
+/*-----------------------------------------------------------------------------
+ Obtain the average value inside the buffer
+-----------------------------------------------------------------------------*/
+uint16_t circularBuffer::GetAverage() {
+    // Check for a non-zero element count
+    return (count > 0) ? total / count : 0;
 }
 
 /*-----------------------------------------------------------------------------
  Free all allocated memory from object
 -----------------------------------------------------------------------------*/
 void circularBuffer::FreeBuffer() {
-    // Free memory (this includes head & tail)
-    free(pBuffer);
+    // Check the buffer is not NULL
+    if (pBuffer) {
+        // Free memory (this includes head & tail)
+        free(pBuffer);
 
-    // Set pointer to null to prevent dangling pointer
-    pBuffer = NULL;
+        // Set pointer to NULL to prevent dangling pointer
+        pBuffer = NULL;
+    }
 }

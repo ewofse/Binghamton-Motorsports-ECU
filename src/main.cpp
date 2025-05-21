@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------------------------------
  EV1 / EV1.5 ECU Master Program
  Programmers: Ethan Wofse, Jake Lin, Markus Higgins, Vansh Joishar
- Last Updated: 04.03.25
+ Last Updated: 05.21.25
 -------------------------------------------------------------------------------------------------*/
 #include "core/ECU.h"
 
@@ -16,24 +16,19 @@ void setup() {
     DebugBegin(SERIAL_RATE);
     DebugPrintln("SERIAL COMMS INITIALIZED");
 
-    // Setup SD memory storage for pedal calibration & telemetry
-    // if ( !SD.begin(BUILTIN_SDCARD) ) {
-	// 	DebugErrorPrint("ERROR: SD CARD FAILED");
-    //     EXIT;
-    // }
-    
-    DebugPrintln("SD MEMORY INITIALIZED");
-
     // Setup WDT for potential software hangs
     IRQHandler::ConfigureWDT();
 
+    // Setup the SD card for DAQ
+    SetupSD();
+
     // SKIPPING DURING TEST BENCHING
 	// Initialize CAN communications
-    // ConfigureCANBus();
+    ConfigureCANBus();
 
     // SKIPPING DURING TEST BENCHING
     // Setup data read requests to Bamocar
-    // RequestBamocarData();
+    RequestBamocarData();
 
     // Set original interrupts
     SetupInterrupts();
@@ -43,11 +38,9 @@ void setup() {
  Main Loop
 -------------------------------------------------------------------------------------------------*/
 void loop() {
-    bool bErrorsLast100ms;
-
     // Get the buffers
-    // uint8_t stateBuf = vehicle.GetSystemData().GetStateBuffer();
-    // uint8_t faultBuf = vehicle.GetSystemData().GetFaultBuffer();
+    uint8_t stateBuf = vehicle.GetSystemData().GetStateBuffer();
+    uint8_t faultBuf = vehicle.GetSystemData().GetFaultBuffer();
 
     // Feed the WDT
     IRQHandler::FeedWDT();
@@ -57,30 +50,9 @@ void loop() {
     -----------------------------------------------------------------------------*/
     vehicle.ProcessState();
 
-    /*-----------------------------------------------------------------------------
-     Pedal Processing
-    -----------------------------------------------------------------------------*/
-    vehicle.GetSystemData().UpdatePedalStructures();
-
-    /*-----------------------------------------------------------------------------
-     Brake Light Updates
-    -----------------------------------------------------------------------------*/
-    vehicle.GetSystemData().ActivateBrakeLight();
-
-    /*-----------------------------------------------------------------------------
-     Pump Control
-    -----------------------------------------------------------------------------*/
-    vehicle.GetSystemData().GetPumpController().TogglePump();
-
-    /*-----------------------------------------------------------------------------
-     Pedal Implausibility (Timer Check)
-    -----------------------------------------------------------------------------*/
-    bErrorsLast100ms = vehicle.GetSystemData().CheckPedalImplausibility();
-    vehicle.GetSystemData().Set100msFlag(bErrorsLast100ms);
-
 	/*-----------------------------------------------------------------------------
      Telemetry & Status CAN Messages
     -----------------------------------------------------------------------------*/
 	// SKIPPING DURING TEST BENCHING
-    // SendCANStatusMessages(&faultBuf, &stateBuf);
+    SendCANStatusMessages(&faultBuf, &stateBuf);
 }	

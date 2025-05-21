@@ -2,12 +2,13 @@
 
 // Initialize variables
 volatile bool IRQHandler::bShutdownCircuitOpen = false;
-volatile bool IRQHandler::bPedalCalibrationMode = false;
-volatile uint8_t IRQHandler::batteryTemperature = 0;
+volatile bool IRQHandler::bButtonHeld = false;
+volatile uint8_t IRQHandler::motorTemperature = 0;
 volatile uint8_t IRQHandler::errorBuf = 0;
 volatile uint32_t IRQHandler::lastPressTime = 0;
 WDT_T4<WDT1> IRQHandler::WDT;
 IntervalTimer IRQHandler::faultLEDTimer;
+IntervalTimer IRQHandler::fadeLEDTimer;
 
 /*-----------------------------------------------------------------------------
  Watchdog timer (WDT) timeout
@@ -45,7 +46,15 @@ void IRQHandler::FeedWDT() {
 }
 
 /*-----------------------------------------------------------------------------
- Set the ISR and frequency of the timer interrupt
+ Reset the system using WDT
+-----------------------------------------------------------------------------*/
+void IRQHandler::ResetWDT() {
+    // Reset WDT
+    WDT.reset();
+}
+
+/*-----------------------------------------------------------------------------
+ Set the ISR and frequency of the fault LED timer interrupt
 -----------------------------------------------------------------------------*/
 void IRQHandler::EnableFaultLEDTimer() {
     // Toggle the LED at 2 Hz
@@ -64,11 +73,30 @@ void IRQHandler::DisableFaultLEDTimer() {
 }
 
 /*-----------------------------------------------------------------------------
+ Set the ISR and frequency of the calibration timer interrupt
+-----------------------------------------------------------------------------*/
+void IRQHandler::EnableCalibrationTimer() {
+    // Call the LED calibration timer functions at 1 kHz
+    fadeLEDTimer.begin(CalibrationHeartbeat, 500);
+}
+
+/*-----------------------------------------------------------------------------
+ Unattach ISR from hardware timer
+-----------------------------------------------------------------------------*/
+void IRQHandler::DisableCalibrationTimer() {
+    // Disable the timer interrupts for the fault LED
+    fadeLEDTimer.end();
+
+    // Set the fault indactor LED low
+    digitalWriteFast(PIN_LED_FAULT, LOW);
+}
+
+/*-----------------------------------------------------------------------------
  Configure pins to be interrupt controlled
 -----------------------------------------------------------------------------*/
 void SetupInterrupts() {
     // Set RTD button pin to be interrupt controlled for pedal calibration
-	attachInterrupt(digitalPinToInterrupt(PIN_RTD_BUTTON), PedalCalibrationISR, FALLING);
+    attachInterrupt(digitalPinToInterrupt(PIN_RTD_BUTTON), RTDButtonISR, CHANGE);
 }
 
 /*-----------------------------------------------------------------------------
@@ -83,19 +111,22 @@ void ShutdownCircuitISR() {
 }
 
 /*-----------------------------------------------------------------------------
- Set a flag high to initiate pedal calibration mode
+ Set a flag high to initiate RTD button pressed
 -----------------------------------------------------------------------------*/
-void PedalCalibrationISR() {
+void RTDButtonISR() {
     // Get current system run time
-    uint32_t currentPressTime = millis();
+    static uint32_t pressStartTime = millis();
 
-	// Detect if RTD button has been held for at least two seconds
-	if ( currentPressTime - IRQHandler::GetLastPressTime() >= PEDAL_CALIBRATION_TIME ) {
-		// Update timer
-        IRQHandler::SetLastPressTime(currentPressTime);
+    // Default the flag to low
+    IRQHandler::SetButtonHeld(false);
 
-        // Set pedal calibration mode flag high
-		IRQHandler::SetCalibrationMode(true);
+    // Check if RTD button was pressed and held for 2 seconds
+    if ( digitalRead(PIN_RTD_BUTTON) ) {
+        // Begin a timer
+        pressStartTime = millis();
+    } else if ( millis() - pressStartTime >= PEDAL_CALIBRATION_TIME ) {
+        // Set flag high
+        IRQHandler::SetButtonHeld(true);
     }
 }
 
@@ -105,6 +136,49 @@ void PedalCalibrationISR() {
 void ToggleFaultLED() {
     // Toggle the LED
     EV1_5_TOGGLE_FAULT_LED();
+}
+
+/*-----------------------------------------------------------------------------
+  Set the fault LED to fade in and out
+-----------------------------------------------------------------------------*/
+void CalibrationHeartbeat() {
+    static bool bIncreaseDutyCycle = true;
+    static uint8_t PWMCounter = 0;
+    static uint8_t currentDutyCycle = 0;
+    static uint8_t timeCounter = 0;
+
+    // Check the PWM counter is less than duty cycle
+    if (PWMCounter < currentDutyCycle) {
+        // Turn on the LED
+        digitalWriteFast(PIN_LED_FAULT, HIGH);
+    } else {
+        // Turn off the LED
+        digitalWriteFast(PIN_LED_FAULT, LOW);
+    }
+
+    // Update PWM counter
+    PWMCounter = (PWMCounter + 1) % 256;
+
+    // Check if 10 ms has elapsed
+    if (++timeCounter >= 10) {
+        // Reset time counter
+        timeCounter = 0;
+
+        // Check if duty cycle is currently increasing
+        if (bIncreaseDutyCycle) {
+            // Check if maximum duty cycle has been reached
+            if (++currentDutyCycle >= 255) {
+                // Begin decrementing duty cycle
+                bIncreaseDutyCycle = false;
+            }
+        } else {
+            // Check if minimum duty cycle has been reached
+            if (--currentDutyCycle == 0) {
+                // Begin incrementing duty cycle
+                bIncreaseDutyCycle = true;
+            }
+        }
+    }
 }
 
 /*-----------------------------------------------------------------------------

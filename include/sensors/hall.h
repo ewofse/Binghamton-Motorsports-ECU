@@ -23,10 +23,12 @@
  Macros - Other
 ------------------------------------------*/
 #define NUM_SENSORS          3
-#define OOR_LOWER_BOUND		 5
-#define OOR_UPPER_BOUND		 1023
+#define OOR_LOWER_BOUND		 320
+#define OOR_UPPER_BOUND		 TWO_BYTES
 #define OOR_LOWER_PERCENT    -0.10
 #define OOR_UPPER_PERCENT    1.10
+#define MAX_TORQUE_REQUEST   6100
+#define HALL_BUFFER_SIZE     5000
 
 /*-------------------------------------------------------------------------------------------------
  Hall Effect Processing
@@ -35,7 +37,7 @@
 class hall {    
     public:
         // Constructor
-        hall(const uint8_t pinValue);
+        hall(const uint8_t pinValue, const bool bInverted);
         
         // Getters
         circularBuffer GetBuffer() { return buffer; }
@@ -48,6 +50,8 @@ class hall {
 
         uint16_t GetPercentRequestLowerBound() { return lower; }
         uint16_t GetPercentRequestUpperBound() { return upper; }
+
+        bool GetVoltageInverted() { return bVoltageInverted; }
 
         // Setters
         void SetRawOutput(uint16_t value) { rawOutput = value; }
@@ -79,9 +83,11 @@ class hall {
         uint16_t cookedOutput;
         uint16_t torqueRequest;
 
-        // Pedal signal percent request bounds
+        // Pedal signal percent request bounds (raw values)
         uint16_t lower;
         uint16_t upper;
+
+        bool bVoltageInverted;
 };
 
 // End safe guards

@@ -53,7 +53,8 @@
 /*------------------------------------------
  Macros - Other
 ------------------------------------------*/
-#define BUFFER_SIZE              6000
+#define ANALOG_PIN_BUFFER_SIZE   500
+#define SDC_TAP_HIGH             512
 #define DELIMITER            	 ','
 #define ADC_RESOLUTION       	 TEN_BITS
 #define ERROR_CODE_SHUTDOWN  	 0
@@ -68,11 +69,13 @@
 #define DEBUG
 
 #ifdef DEBUG
-    #define DebugBegin(baudRate)     Serial.begin(baudRate)
-    #define DebugPrint(message)      Serial.print(message)
-    #define DebugPrintln(message)    Serial.println(message)
-    #define DebugPrintHEX(message)   Serial.print(message, HEX)
-    #define DebugErrorPrint(message) { for (int i = 0; i < 100; ++i) DebugPrintln(message); }
+    #define DebugBegin(baudRate)      Serial.begin(baudRate)
+    #define DebugPrint(message)       Serial.print(message)
+    #define DebugPrintln(message)     Serial.println(message)
+    #define DebugPrintHEX(message)    Serial.print(message, HEX)
+    #define DebugErrorPrint(message)  { for (int i = 0; i < 100; ++i) DebugPrintln(message); }
+    #define DebugPrintVehicleErrors(systemObject) systemObject.DebugPrintErrors()
+    #define DebugPrintCANMessage(message) PrintCANMessage(message);
 #else
     // Empty defines cause all prints to be ignored during acutal operation
     #define DebugBegin(baudRate)
@@ -80,12 +83,14 @@
     #define DebugPrintln(message)
     #define DebugPrintHEX(message)
     #define DebugErrorPrint(message)
+    #define DebugPrintVehicleErrors(system)
+    #define DebugPrintCANMessage(message)
 #endif
 
 /*-------------------------------------------------------------------------------------------------
  States / Data Structures
 -------------------------------------------------------------------------------------------------*/
-typedef enum state {
+enum class systemState {
 	CALIBRATE,
     PEDALS,
     INIT,
@@ -95,14 +100,14 @@ typedef enum state {
     DRIVE,
     BRAKE,
     FAULT
-} state_t;
+};
 
-typedef enum calibrate {
+enum class pedalCalibrate {
 	UPDATE_PEDALS,
     PERCENT_REQ_UPPER,
     PERCENT_REQ_LOWER,
     DONE
-} calibrate_t;
+};
 
 typedef struct timers {
     elapsedMillis chargeTimer;

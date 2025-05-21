@@ -38,7 +38,7 @@ size_t * CharacterIndex(const char * pString, const char character) {
 	// Check number of characters is non-zero and input string is valid
 	if (numCharacters) {
 		// Initialize buffer in memory
-		pIndexBuffer = (size_t *) malloc( numCharacters * sizeof(size_t) );
+		pIndexBuffer = static_cast<size_t *>( malloc( numCharacters * sizeof(size_t) ) );
 
 		// Check buffer initialized correctly
 		if (pIndexBuffer) {
@@ -76,7 +76,7 @@ char * Substring(const char * pString, const size_t start, const size_t end) {
 	// Check for valid string and start and end indicies
 	if (start < stringlength && end < stringlength && start <= end) {
 		// Initialize substring in memory
-		pSubstring = (char *) malloc(substringLength + 1);
+		pSubstring = static_cast<char *>( malloc(substringLength + 1) );
 
 		// Check string initizlied correctly
 		if (pSubstring) {
@@ -112,7 +112,7 @@ uint16_t * SplitIntegerString(const char * pString, const char delimiter, size_t
     // Check for non-zero number of integers and a valid delimiter index buffer
     if (numIntegers && pDelimiters) {
         // Create buffer in memory
-        pBuffer = (uint16_t *) malloc( numIntegers * sizeof(uint16_t) );
+        pBuffer = static_cast<uint16_t *>( malloc( numIntegers * sizeof(uint16_t) ) );
 
         // Check for valid buffer
         if (pBuffer) {
@@ -124,7 +124,7 @@ uint16_t * SplitIntegerString(const char * pString, const char delimiter, size_t
                 // Check for a valid substring
                 if (pSubstring) {
                     // Convert number to integer (base 10)
-                    pBuffer[index] = strtol(pSubstring, NULL, 10);
+                    pBuffer[index] = static_cast<uint16_t>( strtol(pSubstring, NULL, 10) );
 
                     // Free substring from memory after covnersion
                     free(pSubstring);
@@ -140,10 +140,10 @@ uint16_t * SplitIntegerString(const char * pString, const char delimiter, size_t
         }
     } else if (numIntegers == 1) {
         // Create buffer in memory
-        pBuffer = (uint16_t *) malloc( numIntegers * sizeof(uint16_t) );
+        pBuffer = static_cast<uint16_t *>( malloc( numIntegers * sizeof(uint16_t) ) );
 
         // Convert string to integer
-        pBuffer[0] = strtol(pString, NULL, 10);
+        pBuffer[0] = static_cast<uint16_t>( strtol(pString, NULL, 10) );
     }
 
     // Free delimiter index buffer
@@ -199,22 +199,22 @@ void ErrorToSD() {
             switch (currentBit) {
 				// Shutdown circuit opened
                 case (ERROR_CODE_SHUTDOWN): 
-                    strcat(pErrors, "SHUTDOWN ERROR ");
+                    strncat(pErrors, "SHUTDOWN ERROR ", 75 - strlen(pErrors) - 1);
                     break;
 				
 				// APPS sensors disagree
                 case (ERROR_CODE_DISAGREE):
-					strcat(pErrors, "APPS DISAGREE ERROR ");
+					strncat(pErrors, "APPS DISAGREE ERROR ", 75 - strlen(pErrors) - 1);
                     break;
 
 				// APPS & BSE pressed
                 case (ERROR_CODE_APPS_BSE):
-					strcat(pErrors, "APPS BSE ERROR ");
+					strncat(pErrors, "APPS BSE ERROR ", 75 - strlen(pErrors) - 1);
                     break;
 
 				// Sensor(s) out of range
                 case (ERROR_CODE_OOR):
-					strcat(pErrors, "SENSOR OOR ERROR ");
+					strncat(pErrors, "SENSOR OOR ERROR ", 75 - strlen(pErrors) - 1);
                     break;
 
                 default: 
@@ -228,9 +228,30 @@ void ErrorToSD() {
 
 	// Add null terminator and new line characters
 	pBinary[errorLength] = '\0';
-	strcat(pErrors, "\n");
+	strncat(pErrors, "\n", 75 - strlen(pErrors) - 1);
 
 	// Write errors to data file
     WriteDataToFile(FILE_ECU_FAULTS, pBinary, !OVERWRITE); 
     WriteDataToFile(FILE_ECU_FAULTS, pErrors, !OVERWRITE);
+}
+
+/*-----------------------------------------------------------------------------
+ Initialize the SD card and handle any errors
+-----------------------------------------------------------------------------*/
+void SetupSD() {
+	// Setup SD memory storage for pedal calibration & telemetry
+    if ( !SD.begin(BUILTIN_SDCARD) ) {
+		DebugErrorPrint("ERROR: SD CARD FAILED");
+
+        // Enable fault LED to indicate error
+        IRQHandler::EnableFaultLEDTimer();
+        
+        // Wait for 5 seconds to show error state
+        delay(5000);
+        
+        // Trigger immediate system reset
+        IRQHandler::ResetWDT();
+    }
+    
+    DebugPrintln("SD MEMORY INITIALIZED");
 }

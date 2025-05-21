@@ -20,10 +20,16 @@ class circularBuffer {
         size_t GetCount() { return count; }
         uint32_t GetTotal() { return total; }
 
+        // Setters
+        void SetCapacity(size_t value) { capacity = value; }
+        void SetCount(size_t value) { count = value; }
+        void SetTotal(uint32_t value) { total = value; }
+
         // Data methods
-        void FreeBuffer();
         void PushBuffer(uint16_t value);
         uint16_t PullBuffer();
+        uint16_t GetAverage();
+        void FreeBuffer();
 
     private:
         // Data buffer and pointers to current start and end of buffer

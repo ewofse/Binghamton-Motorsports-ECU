@@ -46,17 +46,3 @@ void pumpController::TunePIDGains(double Kp, double Ki, double Kd) {
     // Set controller with new gain terms
     controller.SetTunings(Kp, Ki, Kd);
 }
-
-/*-----------------------------------------------------------------------------
- Drive the pump pin to drive the relay and supply power to the pump
------------------------------------------------------------------------------*/
-void pumpController::TogglePump() {
-    // Check battery pack threshold has been reached
-    if ( IRQHandler::GetBatteryTemperature() > PACK_THRESHOLD ) {
-        // Enable the pump
-        pin.WriteOutput(HIGH);
-    } else {
-        // Disable the pump
-        pin.WriteOutput(LOW);
-    }
-}

@@ -34,5 +34,7 @@ void ErrorToSD();
 
 void CANDataToSD(const CAN_message_t &message);
 
+void SetupSD();
+
 // End safe gaurds
 #endif /* DAQ_H */
