@@ -90,16 +90,16 @@
 /*-------------------------------------------------------------------------------------------------
  States / Data Structures
 -------------------------------------------------------------------------------------------------*/
-enum class systemState {
-	CALIBRATE,
-    PEDALS,
-    INIT,
-    PRECHARGE,
-    WAIT_FOR_RTD,
+enum class systemState : uint8_t {
+    PRECHARGE = 0,
+    RTD,
     IDLE,
     DRIVE,
     BRAKE,
-    FAULT
+    FAULT,
+    INIT,
+    CALIBRATE,
+    PEDALS
 };
 
 enum class pedalCalibrate {

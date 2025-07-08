@@ -68,7 +68,7 @@ class systemData {
 
         void Set100msFlag(bool flag) { timers.b100msPassed = flag; }
 
-        void SetStateBuffer(uint8_t value) { stateBuf = value; }
+        void SetStateBuffer(systemState state) { stateBuf = static_cast<uint8_t>(state); }
         void SetFaultBuffer(uint8_t value) { faultBuf = value; }
 
         // Data methods

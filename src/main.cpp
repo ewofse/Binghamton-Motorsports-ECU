@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------------------------------
  EV1 / EV1.5 ECU Master Program
  Programmers: Ethan Wofse, Jake Lin, Markus Higgins, Vansh Joishar
- Last Updated: 05.21.25
+ Last Updated: 05.28.25
 -------------------------------------------------------------------------------------------------*/
 #include "core/ECU.h"
 
@@ -38,7 +38,7 @@ void setup() {
  Main Loop
 -------------------------------------------------------------------------------------------------*/
 void loop() {
-    // Get the buffers
+    // Get the data buffers sent to the dashboard
     uint8_t stateBuf = vehicle.GetSystemData().GetStateBuffer();
     uint8_t faultBuf = vehicle.GetSystemData().GetFaultBuffer();
 

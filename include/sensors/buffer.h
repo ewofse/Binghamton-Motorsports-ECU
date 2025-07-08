@@ -15,6 +15,9 @@ class circularBuffer {
         // Constructor
         circularBuffer(const size_t elements);
 
+        // Destructor
+        ~circularBuffer();
+
         // Getters
         size_t GetCapacity() { return capacity; }
         size_t GetCount() { return count; }
@@ -29,7 +32,6 @@ class circularBuffer {
         void PushBuffer(uint16_t value);
         uint16_t PullBuffer();
         uint16_t GetAverage();
-        void FreeBuffer();
 
     private:
         // Data buffer and pointers to current start and end of buffer

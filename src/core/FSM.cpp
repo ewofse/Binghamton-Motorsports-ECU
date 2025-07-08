@@ -125,11 +125,9 @@ void systemFSM::INIT() {
  PRECHARGE State - Wait for the tractive system to be energized
 -----------------------------------------------------------------------------*/
 void systemFSM::PRECHARGE() {
-    // Get shutdown tap pin
     analogPin pinSDCTap = system.GetSDCTapPin();
 
-    // Set the PRECHARGE state value to be sent to dashboard
-    system.SetStateBuffer(0);
+    system.SetStateBuffer(systemState::PRECHARGE);
 
     // Begin pedal calibration when startup detected
     if ( IRQHandler::GetButtonHeld() ) {
@@ -180,8 +178,7 @@ void systemFSM::PRECHARGE() {
 void systemFSM::RTD() {
     digitalPin pinRTDBuzzer = system.GetRTDBuzzerPin();
 
-    // Set the RTD state value to be sent to dashboard
-    system.SetStateBuffer(1);
+    system.SetStateBuffer(systemState::RTD);
 
     // Transition to FAULT if any possible error occurs
     if ( system.CheckAllErrors() ) {
@@ -240,8 +237,7 @@ void systemFSM::IDLE() {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
-    // Set the IDLE state value to be sent to dashboard
-    system.SetStateBuffer(2);
+    system.SetStateBuffer(systemState::IDLE);
 
     // Transition to FAULT if any possible error occurs
     if ( system.CheckAllErrors() ) {
@@ -283,8 +279,7 @@ void systemFSM::DRIVE() {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
-    // Set the DRIVE state value to be sent to dashboard
-    system.SetStateBuffer(3);
+    system.SetStateBuffer(systemState::DRIVE);
 
     // Transition to FAULT if any possible error occurs
     if ( system.CheckAllErrors() ) {
@@ -322,8 +317,7 @@ void systemFSM::BRAKE() {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
-    // Set the BRAKE state value to be sent to dashboard
-    system.SetStateBuffer(4);
+    system.SetStateBuffer(systemState::BRAKE);
 
     // Transition to FAULT if any possible error occurs
     if ( system.CheckAllErrors() ) {
@@ -355,14 +349,10 @@ void systemFSM::BRAKE() {
  FAULT State - Shut off power to the motor when an error occurs
 -----------------------------------------------------------------------------*/
 void systemFSM::FAULT() {
-    // Get the shutdown tap pin
     analogPin pinSDCTap = system.GetSDCTapPin();
-
-    // Get the bit field of errors
     uint8_t faultBuf = system.GetFaultBuffer();
 
-    // Set the FAULT state value to be sent to dashboard
-    system.SetStateBuffer(5);
+    system.SetStateBuffer(systemState::FAULT);
 
     // Disable power to motor controller 
     system.DeactivateBamocar();
@@ -411,7 +401,6 @@ void systemFSM::FAULT() {
 void systemFSM::CALIBRATE_PEDALS() {
 	DebugPrintln("BEGINNING PEDAL CALIBARTION...");
 
-    // Get the RTD button pin
     digitalPin pinRTDButton = system.GetRTDButtonPin();
 
     // Disable RTD button interrupt during pedal calibration
@@ -449,7 +438,6 @@ void systemFSM::CALIBRATE_PEDALS() {
 void systemFSM::CALIBRATE_MOTOR() {
     DebugPrintln("BEGINNING MOTOR CALIBARTION...");
 
-    // Get the RTD button pin
     digitalPin pinRTDButton = system.GetRTDButtonPin();
 
     // Disable RTD button interrupt during pedal calibration
