@@ -37,17 +37,17 @@ class systemData {
         digitalPin & GetRTDButtonPin() { return pinRTDButton; }
         analogPin & GetSDCTapPin() { return pinSDCTap; }
 
-        digitalPin GetRUNPin() { return pinRUN; }
-        digitalPin GetGOPin() { return pinRFE; }
-        digitalPin GetRTDBuzzerPin() { return pinRTDBuzzer; }
-        digitalPin GetBrakeLightPin() { return pinBrakeLight; }
-        digitalPin GetResetPin() { return pinReset; }
+        digitalPin & GetRUNPin() { return pinRUN; }
+        digitalPin & GetGOPin() { return pinRFE; }
+        digitalPin & GetRTDBuzzerPin() { return pinRTDBuzzer; }
+        digitalPin & GetBrakeLightPin() { return pinBrakeLight; }
+        digitalPin & GetResetPin() { return pinReset; }
 
-        digitalPin GetAIRPlusPin() { return pinAIRPlus; }
+        digitalPin & GetAIRPlusPin() { return pinAIRPlus; }
 
-        digitalPin GetPumpPin() { return pinPump; }
-        digitalPin GetPumpSwitchPin() { return pinPumpSwitch; }
-        digitalPin GetFaultLEDPin() { return pinFaultLED; }
+        digitalPin & GetPumpPin() { return pinPump; }
+        digitalPin & GetPumpSwitchPin() { return pinPumpSwitch; }
+        digitalPin & GetFaultLEDPin() { return pinFaultLED; }
 
         uint8_t GetStateBuffer() { return stateBuf; }
         uint8_t GetFaultBuffer() { return faultBuf; }
@@ -145,12 +145,12 @@ class systemData {
 };
 
 /*-------------------------------------------------------------------------------------------------
- Vehicle Driving Control FSM
+ Top Level Vehicle Driving Control System
 -------------------------------------------------------------------------------------------------*/
-class systemFSM {
+class systemVehicle {
     public:
         // Constructor
-        systemFSM();
+        systemVehicle();
 
         // Getters
         systemData GetSystemData() { return system; }
@@ -175,7 +175,7 @@ class systemFSM {
         systemData system;
 
         // Declare a function pointer to point to state member functions
-        void (systemFSM::*state)();
+        void (systemVehicle::*state)();
 };
 
 // End safe guards

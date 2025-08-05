@@ -43,15 +43,15 @@ systemData::systemData() :
 /*-----------------------------------------------------------------------------
  FSM system constructor
 -----------------------------------------------------------------------------*/
-systemFSM::systemFSM() {
+systemVehicle::systemVehicle() {
     // Assign current state to the reset state (load pedal configuration)
-    state = &systemFSM::PEDALS;
+    state = &systemVehicle::PEDALS;
 }
 
 /*-----------------------------------------------------------------------------
  FSM system constructor
 -----------------------------------------------------------------------------*/
-void systemFSM::ProcessState() {
+void systemVehicle::ProcessState() {
     // Get the latest reading on the pedals and SDC tap
     system.UpdatePedalStructures();
     system.UpdateSDCTapBuffer();
@@ -75,7 +75,7 @@ void systemFSM::ProcessState() {
 /*-----------------------------------------------------------------------------
  PEDALS State - Load pedal configuration
 -----------------------------------------------------------------------------*/
-void systemFSM::PEDALS() {
+void systemVehicle::PEDALS() {
     // Check for a successful load of pedal bounds
     if ( !system.SetPedalBounds() ) {
         DebugErrorPrint("ERROR: PEDAL BOUNDS NOT SET");
@@ -91,14 +91,14 @@ void systemFSM::PEDALS() {
     }
 
     // Assign member function pointer to next state
-    state = &systemFSM::INIT;
+    state = &systemVehicle::INIT;
     DebugPrintln("STATE: INIT");
 }
 
 /*-----------------------------------------------------------------------------
  INIT State - Activate system reset
 -----------------------------------------------------------------------------*/
-void systemFSM::INIT() {
+void systemVehicle::INIT() {
     // Start the reset timer on first iteration
     if ( !system.GetResetTimerFlag() ) {
         system.SetResetTimerFlag(true);
@@ -117,14 +117,14 @@ void systemFSM::INIT() {
     DebugPrintln("SHUTDOWN CIRCUIT RESET");
 
     // Assign member function pointer to next state
-    state = &systemFSM::PRECHARGE;
+    state = &systemVehicle::PRECHARGE;
     DebugPrintln("STATE: PRECHARGE");
 }
 
 /*-----------------------------------------------------------------------------
  PRECHARGE State - Wait for the tractive system to be energized
 -----------------------------------------------------------------------------*/
-void systemFSM::PRECHARGE() {
+void systemVehicle::PRECHARGE() {
     analogPin pinSDCTap = system.GetSDCTapPin();
 
     system.SetStateBuffer(systemState::PRECHARGE);
@@ -137,7 +137,7 @@ void systemFSM::PRECHARGE() {
         // Use fault LED on ECU to indicate calibration mode
 		IRQHandler::EnableCalibrationTimer();
 
-        state = &systemFSM::CALIBRATE_PEDALS;
+        state = &systemVehicle::CALIBRATE_PEDALS;
         DebugPrintln("STATE: CALIBRATE PEDALS");
         return;
     }
@@ -168,14 +168,14 @@ void systemFSM::PRECHARGE() {
     DebugPrintln("SYSTEM CHARGED");
 
     // Transition to RTD when vehicle is powered
-    state = &systemFSM::RTD;
+    state = &systemVehicle::RTD;
     DebugPrintln("STATE: RTD");
 }
 
 /*-----------------------------------------------------------------------------
  RTD State - Wait for the driver to activate the vehicle
 -----------------------------------------------------------------------------*/
-void systemFSM::RTD() {
+void systemVehicle::RTD() {
     digitalPin pinRTDBuzzer = system.GetRTDBuzzerPin();
 
     system.SetStateBuffer(systemState::RTD);
@@ -188,7 +188,7 @@ void systemFSM::RTD() {
         // Output ECU errors
         DebugPrintVehicleErrors(system);
 
-        state = &systemFSM::FAULT;
+        state = &systemVehicle::FAULT;
         DebugPrintln("STATE: FAULT");
         return;
     }
@@ -198,7 +198,7 @@ void systemFSM::RTD() {
         // Use fault LED on ECU to indicate calibration mode
 		IRQHandler::EnableCalibrationTimer();
 
-        state = &systemFSM::CALIBRATE_MOTOR;
+        state = &systemVehicle::CALIBRATE_MOTOR;
         DebugPrintln("STATE: CALIBRATE MOTOR");
         return;
     }
@@ -225,7 +225,7 @@ void systemFSM::RTD() {
         pinRTDBuzzer.WriteOutput(LOW);
         system.SetBuzzerTimerFlag(false);
 
-        state = &systemFSM::IDLE;
+        state = &systemVehicle::IDLE;
         DebugPrintln("STATE: IDLE");
     }
 }
@@ -233,7 +233,7 @@ void systemFSM::RTD() {
 /*-----------------------------------------------------------------------------
  IDLE State - Wait for the driver pedal input to drive or brake
 -----------------------------------------------------------------------------*/
-void systemFSM::IDLE() {
+void systemVehicle::IDLE() {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
@@ -247,21 +247,21 @@ void systemFSM::IDLE() {
         // Output ECU errors
         DebugPrintVehicleErrors(system);
 
-        state = &systemFSM::FAULT;
+        state = &systemVehicle::FAULT;
         DebugPrintln("STATE: FAULT");
         return;
     }
 
     // Switch to DRIVE state after surpassing throttle threshold
     if ( system.GetLowerPercentAPPS() * 100 > PERCENT_THRESHOLD ) {
-        state = &systemFSM::DRIVE;
+        state = &systemVehicle::DRIVE;
         DebugPrintln("STATE: DRIVE");
         return;
     } 
 
     // Switch to BRAKE state after surpassing brake threshold
     if ( system.GetBSE().GetPercentRequest() * 100 > PERCENT_BRAKE ) {
-        state = &systemFSM::BRAKE;
+        state = &systemVehicle::BRAKE;
         DebugPrintln("STATE: BRAKE");
         return;
     }
@@ -275,7 +275,7 @@ void systemFSM::IDLE() {
 /*-----------------------------------------------------------------------------
  DRIVE State - Wait for the driver pedal input to drive or brake
 -----------------------------------------------------------------------------*/
-void systemFSM::DRIVE() {
+void systemVehicle::DRIVE() {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
@@ -289,14 +289,14 @@ void systemFSM::DRIVE() {
         // Output ECU errors
         DebugPrintVehicleErrors(system);
 
-        state = &systemFSM::FAULT;
+        state = &systemVehicle::FAULT;
         DebugPrintln("STATE: FAULT");
         return;
     }
 
     // Transition to IDLE state if APPS receive minimal force (braking)
     if ( system.GetLowerPercentAPPS() * 100 < PERCENT_THRESHOLD ) {
-        state = &systemFSM::IDLE;
+        state = &systemVehicle::IDLE;
         DebugPrintln("STATE: IDLE");
         return;
     }
@@ -313,7 +313,7 @@ void systemFSM::DRIVE() {
 /*-----------------------------------------------------------------------------
  BRAKE State - Apply zero torque to motor and slow down vehicle
 -----------------------------------------------------------------------------*/
-void systemFSM::BRAKE() {
+void systemVehicle::BRAKE() {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
@@ -327,14 +327,14 @@ void systemFSM::BRAKE() {
         // Output ECU errors
         DebugPrintVehicleErrors(system);
 
-        state = &systemFSM::FAULT;
+        state = &systemVehicle::FAULT;
         DebugPrintln("STATE: FAULT");
         return;
     }
 
     // Transition to IDLE state if BSE receives minimal force
     if ( system.GetBSE().GetPercentRequest() * 100 < PERCENT_BRAKE ) {
-        state = &systemFSM::IDLE;
+        state = &systemVehicle::IDLE;
         DebugPrintln("STATE: IDLE");
         return;
     }
@@ -348,7 +348,7 @@ void systemFSM::BRAKE() {
 /*-----------------------------------------------------------------------------
  FAULT State - Shut off power to the motor when an error occurs
 -----------------------------------------------------------------------------*/
-void systemFSM::FAULT() {
+void systemVehicle::FAULT() {
     analogPin pinSDCTap = system.GetSDCTapPin();
     uint8_t faultBuf = system.GetFaultBuffer();
 
@@ -374,7 +374,7 @@ void systemFSM::FAULT() {
         IRQHandler::DisableFaultLEDTimer();
 
         // Revert to IDLE state
-        state = &systemFSM::IDLE;
+        state = &systemVehicle::IDLE;
         DebugPrintln("STATE: IDLE");
         return;
     }
@@ -389,7 +389,7 @@ void systemFSM::FAULT() {
         IRQHandler::DisableFaultLEDTimer();
 
         // Revert to RTD state
-        state = &systemFSM::RTD;
+        state = &systemVehicle::RTD;
         DebugPrintln("STATE: RTD");
         return;
     }
@@ -398,7 +398,7 @@ void systemFSM::FAULT() {
 /*-----------------------------------------------------------------------------
  CALIBRATE PEDALS State - Re-configure pedal sensors
 -----------------------------------------------------------------------------*/
-void systemFSM::CALIBRATE_PEDALS() {
+void systemVehicle::CALIBRATE_PEDALS() {
 	DebugPrintln("BEGINNING PEDAL CALIBARTION...");
 
     digitalPin pinRTDButton = system.GetRTDButtonPin();
@@ -428,14 +428,14 @@ void systemFSM::CALIBRATE_PEDALS() {
     DebugPrint("BSE Upper Bound: "); DebugPrintln( system.GetBSE().GetPercentRequestUpperBound() );
 
     // Transition back to PEDALS to read in new encoded values
-    state = &systemFSM::PEDALS;
+    state = &systemVehicle::PEDALS;
     DebugPrintln("STATE: PEDALS");
 }
 
 /*-----------------------------------------------------------------------------
  CALIBRATE MOTOR State - Calibrate motor with Bamocar
 -----------------------------------------------------------------------------*/
-void systemFSM::CALIBRATE_MOTOR() {
+void systemVehicle::CALIBRATE_MOTOR() {
     DebugPrintln("BEGINNING MOTOR CALIBARTION...");
 
     digitalPin pinRTDButton = system.GetRTDButtonPin();
@@ -456,6 +456,6 @@ void systemFSM::CALIBRATE_MOTOR() {
     attachInterrupt(digitalPinToInterrupt( pinRTDButton.GetPin() ), RTDButtonISR, CHANGE);
 
      // Transition back to RTD for driving
-    state = &systemFSM::RTD;
+    state = &systemVehicle::RTD;
     DebugPrintln("STATE: RTD");
 }
