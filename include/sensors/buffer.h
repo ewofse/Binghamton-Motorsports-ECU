@@ -5,7 +5,8 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
-#include "core/general.h"
+#include <stdint.h>
+#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  Circular Buffer with a Total Sum
@@ -16,12 +17,12 @@ class circularBuffer {
         circularBuffer(const size_t elements);
 
         // Destructor
-        ~circularBuffer();
+        ~circularBuffer(void);
 
         // Getters
-        size_t GetCapacity() { return capacity; }
-        size_t GetCount() { return count; }
-        uint32_t GetTotal() { return total; }
+        size_t GetCapacity(void) { return capacity; }
+        size_t GetCount(void) { return count; }
+        uint32_t GetTotal(void) { return total; }
 
         // Setters
         void SetCapacity(size_t value) { capacity = value; }
@@ -30,8 +31,8 @@ class circularBuffer {
 
         // Data methods
         void PushBuffer(uint16_t value);
-        uint16_t PullBuffer();
-        uint16_t GetAverage();
+        uint16_t PullBuffer(void);
+        uint16_t GetAverage(void);
 
     private:
         // Data buffer and pointers to current start and end of buffer

@@ -5,15 +5,15 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
-#include <FlexCAN_T4.h>
-#include <Watchdog_t4.h>
-#include <Teensy_PWM.h>
-#include <PID_v2.h>
-
 #include <Arduino.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <FlexCAN_T4.h>
+#include <Watchdog_t4.h>
+#include <Teensy_PWM.h>
+#include <PID_v2.h>
 #include <SPI.h>
 #include <SD.h>
 

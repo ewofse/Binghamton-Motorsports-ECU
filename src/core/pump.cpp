@@ -27,7 +27,7 @@ void pumpController::RunPWM(float frequency, float dutyCycle) {
 /*-----------------------------------------------------------------------------
  Initiate the PID controller
 -----------------------------------------------------------------------------*/
-void pumpController::BeginPID() {
+void pumpController::BeginPID(void) {
     // Begin the PID feedback control system
     controller.Start(input, output, setpoint);
 }
@@ -35,7 +35,7 @@ void pumpController::BeginPID() {
 /*-----------------------------------------------------------------------------
  Get the PID output
 -----------------------------------------------------------------------------*/
-void pumpController::RunPID() {
+void pumpController::RunPID(void) {
     output = controller.Run(input);
 }
 

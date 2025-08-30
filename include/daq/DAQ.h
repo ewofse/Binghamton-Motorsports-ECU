@@ -5,9 +5,13 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
-#include "core/general.h"
+#include <stdint.h>
+#include <stdlib.h>
+
+#include <FlexCAN_T4.h>
+
 #include "interrupts/interrupts.h"
-#include "comms/CAN.h"
+#include "core/general.h"
 
 /*------------------------------------------
  Macros - Files
@@ -30,11 +34,11 @@ uint16_t * SplitIntegerString(const char * pString, const char delimiter, size_t
 
 void WriteDataToFile(const char * pFileName, const char * pString, bool bOverwrite);
 
-void ErrorToSD();
+void ErrorToSD(void);
 
 void CANDataToSD(const CAN_message_t &message);
 
-void SetupSD();
+void SetupSD(void);
 
 // End safe gaurds
 #endif /* DAQ_H */

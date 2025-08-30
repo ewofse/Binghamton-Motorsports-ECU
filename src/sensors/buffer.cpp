@@ -31,7 +31,7 @@ circularBuffer::circularBuffer(const size_t elements) {
 /*-----------------------------------------------------------------------------
  Free all allocated memory from object
 -----------------------------------------------------------------------------*/
-circularBuffer::~circularBuffer() {
+circularBuffer::~circularBuffer(void) {
     // Check the buffer is not NULL
     if (pBuffer) {
         // Free memory (this includes head & tail)
@@ -84,7 +84,7 @@ void circularBuffer::PushBuffer(uint16_t value) {
 /*-----------------------------------------------------------------------------
  Obtain an element from circular buffer
 -----------------------------------------------------------------------------*/
-uint16_t circularBuffer::PullBuffer() {
+uint16_t circularBuffer::PullBuffer(void) {
     uint16_t value = 0;
 
     // Check the buffer was initialized
@@ -99,7 +99,7 @@ uint16_t circularBuffer::PullBuffer() {
 /*-----------------------------------------------------------------------------
  Obtain the average value inside the buffer
 -----------------------------------------------------------------------------*/
-uint16_t circularBuffer::GetAverage() {
+uint16_t circularBuffer::GetAverage(void) {
     // Check for a non-zero element count
     return (count > 0) ? total / count : 0;
 }

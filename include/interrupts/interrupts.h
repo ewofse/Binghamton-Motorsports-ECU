@@ -5,6 +5,11 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
+#include <Arduino.h>
+#include <stdint.h>
+
+#include <Watchdog_t4.h>
+
 #include "core/general.h"
 #include "core/pin.h"
 
@@ -14,12 +19,12 @@
 class IRQHandler {
     public:
         // Getters
-        static bool GetShutdownState() { return bShutdownCircuitOpen; }
-        static bool GetButtonHeld() { return bButtonHeld; }
-        static uint8_t GetErrorBuffer() { return errorBuf; }
-        static uint32_t GetLastPressTime() { return lastPressTime; }
+        static bool GetShutdownState(void) { return bShutdownCircuitOpen; }
+        static bool GetButtonHeld(void) { return bButtonHeld; }
+        static uint8_t GetErrorBuffer(void) { return errorBuf; }
+        static uint32_t GetLastPressTime(void) { return lastPressTime; }
 
-        static uint8_t GetMotorTemperature() { return motorTemperature; }
+        static uint8_t GetMotorTemperature(void) { return motorTemperature; }
 
         // Setters
         static void SetShutdownState(bool flag) { bShutdownCircuitOpen = flag; }
@@ -30,17 +35,17 @@ class IRQHandler {
         static void SetMotorTemperature(uint8_t value) { motorTemperature = value; }
 
         // Watchdog methods
-        static void ConfigureWDT();
-        static void FeedWDT();
-        static void CallbackWDT();
-        static void ResetWDT();
+        static void ConfigureWDT(void);
+        static void FeedWDT(void);
+        static void CallbackWDT(void);
+        static void ResetWDT(void);
 
         // LED methods
-        static void EnableFaultLEDTimer();
-        static void DisableFaultLEDTimer();
+        static void EnableFaultLEDTimer(void);
+        static void DisableFaultLEDTimer(void);
 
-        static void EnableCalibrationTimer();
-        static void DisableCalibrationTimer();
+        static void EnableCalibrationTimer(void);
+        static void DisableCalibrationTimer(void);
 
     private:
         // Data modified in ISRs
@@ -63,26 +68,26 @@ class IRQHandler {
 /*-------------------------------------------------------------------------------------------------
  Prototypes for Interrupt Service Routines (ISRs)
 -------------------------------------------------------------------------------------------------*/
-void SetupInterrupts();
+void SetupInterrupts(void);
 
-void ShutdownCircuitISR();
+void ShutdownCircuitISR(void);
 
-void RTDButtonISR();
+void RTDButtonISR(void);
 
-void ToggleFaultLED();
+void ToggleFaultLED(void);
 
-void CalibrationHeartbeat();
+void CalibrationHeartbeat(void);
 
 /*-------------------------------------------------------------------------------------------------
  ISR data related functions
 -------------------------------------------------------------------------------------------------*/
-bool ShutdownCircuitOpen();
+bool ShutdownCircuitOpen(void);
 
-bool PedalsDisagree();
+bool PedalsDisagree(void);
 
-bool BothPedalsPressed();
+bool BothPedalsPressed(void);
 
-bool PedalsOOR();
+bool PedalsOOR(void);
 
 // End safe guards
 #endif /* INTERRUPTS_H */

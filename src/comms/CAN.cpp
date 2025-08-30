@@ -6,7 +6,7 @@ FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 /*-----------------------------------------------------------------------------
  Configure the CAN bus network
 -----------------------------------------------------------------------------*/
-void ConfigureCANBus() {
+void ConfigureCANBus(void) {
 	// Enable CAN bus
 	myCan.begin();
 	myCan.setBaudRate(BAUD_RATE);
@@ -215,7 +215,7 @@ void SendCANStatusMessages(uint8_t * errors, uint8_t * state) {
 /*-----------------------------------------------------------------------------
  Request data from Bamocar registers at a set periodic interval
 -----------------------------------------------------------------------------*/
-void RequestBamocarData() {
+void RequestBamocarData(void) {
 	CAN_message_t msgBamocarRequest;
 
 	// Motor temperature

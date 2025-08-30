@@ -5,10 +5,12 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
-#include "general.h"
+#include <stdint.h>
+
+#include <Teensy_PWM.h>
+#include <PID_v2.h>
+
 #include "pin.h"
-#include "interrupts/interrupts.h"
-#include "comms/CAN.h"
 
 /*------------------------------------------
  Macros - Temperature thresholds
@@ -25,14 +27,14 @@ class pumpController {
         pumpController(uint8_t pinValue, double Kp, double Ki, double Kd);
 
         // Getters
-        digitalPin GetPin() { return pin; }
+        digitalPin GetPin(void) { return pin; }
 
-        float GetPIDInput() { return input; }
-        float GetPIDOutput() { return output; }
-        float GetPIDSetpoint() { return setpoint; }
+        float GetPIDInput(void) { return input; }
+        float GetPIDOutput(void) { return output; }
+        float GetPIDSetpoint(void) { return setpoint; }
 
-        uint8_t GetPWMFrequency() { return frequency; }
-        uint8_t GetPWMDutyCycle() { return dutyCycle; }
+        uint8_t GetPWMFrequency(void) { return frequency; }
+        uint8_t GetPWMDutyCycle(void) { return dutyCycle; }
         
         // Setters
         void SetPIDInput(float value) { input = value; }
@@ -44,8 +46,8 @@ class pumpController {
 
         // Data methods
         void RunPWM(float frequency, float dutyCycle);
-        void BeginPID();
-        void RunPID();
+        void BeginPID(void);
+        void RunPID(void);
         void TunePIDGains(double Kp, double Ki, double Kd);
 
     private:

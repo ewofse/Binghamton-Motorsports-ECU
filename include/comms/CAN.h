@@ -5,6 +5,10 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
+#include <stdint.h>
+
+#include <FlexCAN_T4.h>
+
 #include "core/general.h"
 #include "interrupts/interrupts.h"
 
@@ -81,7 +85,7 @@ extern FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> myCan;
 /*-------------------------------------------------------------------------------------------------
  Prototypes
 -------------------------------------------------------------------------------------------------*/
-void ConfigureCANBus();
+void ConfigureCANBus(void);
 
 void PrintCANMessage(const CAN_message_t & message);
 
@@ -101,6 +105,6 @@ void SendCANMessage(const CAN_message_t & message, const FLEXCAN_MAILBOX MB);
 
 void SendCANStatusMessages(uint8_t * errors, uint8_t * state);
 
-void RequestBamocarData();
+void RequestBamocarData(void);
 
 #endif /* CAN_H */

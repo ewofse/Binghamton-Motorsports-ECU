@@ -181,7 +181,7 @@ void WriteDataToFile(const char * pFileName, const char * pString, bool bOverwri
 /*-----------------------------------------------------------------------------
  Write which errors occured to a data file
 -----------------------------------------------------------------------------*/
-void ErrorToSD() {
+void ErrorToSD(void) {
 	constexpr uint8_t errorLength = 4;
 	bool bBitHigh = false;
 
@@ -238,7 +238,7 @@ void ErrorToSD() {
 /*-----------------------------------------------------------------------------
  Initialize the SD card and handle any errors
 -----------------------------------------------------------------------------*/
-void SetupSD() {
+void SetupSD(void) {
 	// Setup SD memory storage for pedal calibration & telemetry
     if ( !SD.begin(BUILTIN_SDCARD) ) {
 		DebugErrorPrint("ERROR: SD CARD FAILED");

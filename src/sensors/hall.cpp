@@ -23,7 +23,7 @@ hall::hall(const uint8_t pinValue, const bool bInverted) :
 /*-----------------------------------------------------------------------------
  Obtain the analog value of pedal
 -----------------------------------------------------------------------------*/
-uint16_t hall::ReadPedal() {
+uint16_t hall::ReadPedal(void) {
     // Read outputted voltage signal - 10-bit resolution
     return pin.ReadRawPinAnalog();
 }
@@ -31,7 +31,7 @@ uint16_t hall::ReadPedal() {
 /*-----------------------------------------------------------------------------
  Obtain the percent of pedal pressed
 -----------------------------------------------------------------------------*/
-float hall::GetPercentRequest() {
+float hall::GetPercentRequest(void) {
     // Interpolate the analog value through a percent request
     float precentRequest = (float) (cookedOutput - lower) / (upper - lower);
 
@@ -47,7 +47,7 @@ float hall::GetPercentRequest() {
 /*-----------------------------------------------------------------------------
  Average the signal incoming from hall sensor (low pass filter)
 -----------------------------------------------------------------------------*/
-void hall::AverageSignal() {
+void hall::AverageSignal(void) {
     // Modify signal buffer by adding newest reading
     buffer.PushBuffer(rawOutput);
 
@@ -62,7 +62,7 @@ void hall::AverageSignal() {
 /*----------------------------------------------------------------------------- 
  Update a hall sensor's data
 -----------------------------------------------------------------------------*/
-void hall::UpdatePedalData() {
+void hall::UpdatePedalData(void) {
     // Read the raw signal from input analog pin
     rawOutput = ReadPedal();
 
@@ -81,7 +81,7 @@ void hall::UpdatePedalData() {
 /*-----------------------------------------------------------------------------
  Check if a pedal is OOR - Returns true if it is OOR
 -----------------------------------------------------------------------------*/
-bool hall::CheckPedalOOR() {
+bool hall::CheckPedalOOR(void) {
     float request = GetPercentRequest();
 
     // Check the raw analog pin reading has not been shorted/opened

@@ -5,10 +5,11 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
+#include <stdint.h>
+
 #include "core/general.h"
 #include "core/pin.h"
-#include "daq/DAQ.h"
-#include "buffer.h"
+#include "sensors/buffer.h"
 
 /*------------------------------------------
  Macros - Hall Effect Sensor Percentages
@@ -40,18 +41,18 @@ class hall {
         hall(const uint8_t pinValue, const bool bInverted);
         
         // Getters
-        circularBuffer GetBuffer() { return buffer; }
-        analogPin GetPin() { return pin; }
+        circularBuffer GetBuffer(void) { return buffer; }
+        analogPin GetPin(void) { return pin; }
 
-        uint16_t GetRawOutput() { return rawOutput; }
-        uint16_t GetNormalizedRawOutput() { return normalizedRawOutput; }
-        uint16_t GetCookedOutput() { return cookedOutput; }
-        uint16_t GetTorqueRequest() { return torqueRequest; }
+        uint16_t GetRawOutput(void) { return rawOutput; }
+        uint16_t GetNormalizedRawOutput(void) { return normalizedRawOutput; }
+        uint16_t GetCookedOutput(void) { return cookedOutput; }
+        uint16_t GetTorqueRequest(void) { return torqueRequest; }
 
-        uint16_t GetPercentRequestLowerBound() { return lower; }
-        uint16_t GetPercentRequestUpperBound() { return upper; }
+        uint16_t GetPercentRequestLowerBound(void) { return lower; }
+        uint16_t GetPercentRequestUpperBound(void) { return upper; }
 
-        bool GetVoltageInverted() { return bVoltageInverted; }
+        bool GetVoltageInverted(void) { return bVoltageInverted; }
 
         // Setters
         void SetRawOutput(uint16_t value) { rawOutput = value; }
@@ -63,15 +64,15 @@ class hall {
         void SetPercentRequestUpperBound(uint16_t value) { upper = value; }
 
         // Data methods
-        uint16_t ReadPedal();
+        uint16_t ReadPedal(void);
 
-        float GetPercentRequest();
+        float GetPercentRequest(void);
 
-        void AverageSignal();
+        void AverageSignal(void);
 
-        void UpdatePedalData();
+        void UpdatePedalData(void);
         
-        bool CheckPedalOOR();
+        bool CheckPedalOOR(void);
 
     private:
         circularBuffer buffer; // Circular buffer for signal averaging

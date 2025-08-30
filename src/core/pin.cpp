@@ -58,7 +58,7 @@ analogPin::analogPin(const uint8_t pinValue, bool bPinMode, size_t size) :
 /*-----------------------------------------------------------------------------
  Debounce the incoming signal into the pin
 -----------------------------------------------------------------------------*/
-bool digitalPin::ReadDebouncedPin() {
+bool digitalPin::ReadDebouncedPin(void) {
 	// Read the current pin state
 	currentRawState = ReadRawPinDigital();
 

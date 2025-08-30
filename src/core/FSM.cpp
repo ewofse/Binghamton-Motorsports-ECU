@@ -3,7 +3,7 @@
 /*-----------------------------------------------------------------------------
  FSM data constructor
 -----------------------------------------------------------------------------*/
-systemData::systemData() :
+systemData::systemData(void) :
     APPS1(PIN_APPS_ONE, false),
     APPS2(PIN_APPS_TWO, false),
     BSE(PIN_BSE, true),
@@ -43,7 +43,7 @@ systemData::systemData() :
 /*-----------------------------------------------------------------------------
  FSM system constructor
 -----------------------------------------------------------------------------*/
-systemVehicle::systemVehicle() {
+systemVehicle::systemVehicle(void) {
     // Assign current state to the reset state (load pedal configuration)
     state = &systemVehicle::PEDALS;
 }
@@ -51,7 +51,7 @@ systemVehicle::systemVehicle() {
 /*-----------------------------------------------------------------------------
  FSM system constructor
 -----------------------------------------------------------------------------*/
-void systemVehicle::ProcessState() {
+void systemVehicle::ProcessState(void) {
     // Get the latest reading on the pedals and SDC tap
     system.UpdatePedalStructures();
     system.UpdateSDCTapBuffer();
@@ -75,7 +75,7 @@ void systemVehicle::ProcessState() {
 /*-----------------------------------------------------------------------------
  PEDALS State - Load pedal configuration
 -----------------------------------------------------------------------------*/
-void systemVehicle::PEDALS() {
+void systemVehicle::PEDALS(void) {
     // Check for a successful load of pedal bounds
     if ( !system.SetPedalBounds() ) {
         DebugErrorPrint("ERROR: PEDAL BOUNDS NOT SET");
@@ -98,7 +98,7 @@ void systemVehicle::PEDALS() {
 /*-----------------------------------------------------------------------------
  INIT State - Activate system reset
 -----------------------------------------------------------------------------*/
-void systemVehicle::INIT() {
+void systemVehicle::INIT(void) {
     // Start the reset timer on first iteration
     if ( !system.GetResetTimerFlag() ) {
         system.SetResetTimerFlag(true);
@@ -124,7 +124,7 @@ void systemVehicle::INIT() {
 /*-----------------------------------------------------------------------------
  PRECHARGE State - Wait for the tractive system to be energized
 -----------------------------------------------------------------------------*/
-void systemVehicle::PRECHARGE() {
+void systemVehicle::PRECHARGE(void) {
     analogPin pinSDCTap = system.GetSDCTapPin();
 
     system.SetStateBuffer(systemState::PRECHARGE);
@@ -175,7 +175,7 @@ void systemVehicle::PRECHARGE() {
 /*-----------------------------------------------------------------------------
  RTD State - Wait for the driver to activate the vehicle
 -----------------------------------------------------------------------------*/
-void systemVehicle::RTD() {
+void systemVehicle::RTD(void) {
     digitalPin pinRTDBuzzer = system.GetRTDBuzzerPin();
 
     system.SetStateBuffer(systemState::RTD);
@@ -233,7 +233,7 @@ void systemVehicle::RTD() {
 /*-----------------------------------------------------------------------------
  IDLE State - Wait for the driver pedal input to drive or brake
 -----------------------------------------------------------------------------*/
-void systemVehicle::IDLE() {
+void systemVehicle::IDLE(void) {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
@@ -275,7 +275,7 @@ void systemVehicle::IDLE() {
 /*-----------------------------------------------------------------------------
  DRIVE State - Wait for the driver pedal input to drive or brake
 -----------------------------------------------------------------------------*/
-void systemVehicle::DRIVE() {
+void systemVehicle::DRIVE(void) {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
@@ -313,7 +313,7 @@ void systemVehicle::DRIVE() {
 /*-----------------------------------------------------------------------------
  BRAKE State - Apply zero torque to motor and slow down vehicle
 -----------------------------------------------------------------------------*/
-void systemVehicle::BRAKE() {
+void systemVehicle::BRAKE(void) {
     CAN_message_t msgTorque;
     uint8_t torqueBuf[PAR_RX_DLC] = {0, 0, 0};
 
@@ -348,7 +348,7 @@ void systemVehicle::BRAKE() {
 /*-----------------------------------------------------------------------------
  FAULT State - Shut off power to the motor when an error occurs
 -----------------------------------------------------------------------------*/
-void systemVehicle::FAULT() {
+void systemVehicle::FAULT(void) {
     analogPin pinSDCTap = system.GetSDCTapPin();
     uint8_t faultBuf = system.GetFaultBuffer();
 
@@ -398,7 +398,7 @@ void systemVehicle::FAULT() {
 /*-----------------------------------------------------------------------------
  CALIBRATE PEDALS State - Re-configure pedal sensors
 -----------------------------------------------------------------------------*/
-void systemVehicle::CALIBRATE_PEDALS() {
+void systemVehicle::CALIBRATE_PEDALS(void) {
 	DebugPrintln("BEGINNING PEDAL CALIBARTION...");
 
     digitalPin pinRTDButton = system.GetRTDButtonPin();
@@ -435,7 +435,7 @@ void systemVehicle::CALIBRATE_PEDALS() {
 /*-----------------------------------------------------------------------------
  CALIBRATE MOTOR State - Calibrate motor with Bamocar
 -----------------------------------------------------------------------------*/
-void systemVehicle::CALIBRATE_MOTOR() {
+void systemVehicle::CALIBRATE_MOTOR(void) {
     DebugPrintln("BEGINNING MOTOR CALIBARTION...");
 
     digitalPin pinRTDButton = system.GetRTDButtonPin();

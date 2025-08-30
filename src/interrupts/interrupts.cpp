@@ -13,7 +13,7 @@ IntervalTimer IRQHandler::fadeLEDTimer;
 /*-----------------------------------------------------------------------------
  Watchdog timer (WDT) timeout
 -----------------------------------------------------------------------------*/
-void IRQHandler::CallbackWDT() {
+void IRQHandler::CallbackWDT(void) {
 	// Warn user to feed
     DebugPrintln("WARNING: FEED SOON OR RESET");
 }
@@ -21,7 +21,7 @@ void IRQHandler::CallbackWDT() {
 /*-----------------------------------------------------------------------------
  Initialize WDT timeout period and functionality
 -----------------------------------------------------------------------------*/
-void IRQHandler::ConfigureWDT() {
+void IRQHandler::ConfigureWDT(void) {
     WDT_timings_t config;
 
     config.trigger = 5; // Callback function is called every 5 seconds
@@ -35,7 +35,7 @@ void IRQHandler::ConfigureWDT() {
 /*-----------------------------------------------------------------------------
  Initialize WDT timeout period and functionality
 -----------------------------------------------------------------------------*/
-void IRQHandler::FeedWDT() {
+void IRQHandler::FeedWDT(void) {
     static uint32_t feed = millis();
     
     // Feed every 4 seconds
@@ -48,7 +48,7 @@ void IRQHandler::FeedWDT() {
 /*-----------------------------------------------------------------------------
  Reset the system using WDT
 -----------------------------------------------------------------------------*/
-void IRQHandler::ResetWDT() {
+void IRQHandler::ResetWDT(void) {
     // Reset WDT
     WDT.reset();
 }
@@ -56,7 +56,7 @@ void IRQHandler::ResetWDT() {
 /*-----------------------------------------------------------------------------
  Set the ISR and frequency of the fault LED timer interrupt
 -----------------------------------------------------------------------------*/
-void IRQHandler::EnableFaultLEDTimer() {
+void IRQHandler::EnableFaultLEDTimer(void) {
     // Toggle the LED at 2 Hz
     faultLEDTimer.begin(ToggleFaultLED, 250000);
 }
@@ -64,7 +64,7 @@ void IRQHandler::EnableFaultLEDTimer() {
 /*-----------------------------------------------------------------------------
  Unattach ISR from hardware timer
 -----------------------------------------------------------------------------*/
-void IRQHandler::DisableFaultLEDTimer() {
+void IRQHandler::DisableFaultLEDTimer(void) {
     // Disable timer interrupt for the fault LED
     faultLEDTimer.end();
 
@@ -75,7 +75,7 @@ void IRQHandler::DisableFaultLEDTimer() {
 /*-----------------------------------------------------------------------------
  Set the ISR and frequency of the calibration timer interrupt
 -----------------------------------------------------------------------------*/
-void IRQHandler::EnableCalibrationTimer() {
+void IRQHandler::EnableCalibrationTimer(void) {
     // Call the LED calibration timer functions at 1 kHz
     fadeLEDTimer.begin(CalibrationHeartbeat, 500);
 }
@@ -83,7 +83,7 @@ void IRQHandler::EnableCalibrationTimer() {
 /*-----------------------------------------------------------------------------
  Unattach ISR from hardware timer
 -----------------------------------------------------------------------------*/
-void IRQHandler::DisableCalibrationTimer() {
+void IRQHandler::DisableCalibrationTimer(void) {
     // Disable the timer interrupts for the fault LED
     fadeLEDTimer.end();
 
@@ -94,7 +94,7 @@ void IRQHandler::DisableCalibrationTimer() {
 /*-----------------------------------------------------------------------------
  Configure pins to be interrupt controlled
 -----------------------------------------------------------------------------*/
-void SetupInterrupts() {
+void SetupInterrupts(void) {
     // Set RTD button pin to be interrupt controlled for pedal calibration
     attachInterrupt(digitalPinToInterrupt(PIN_RTD_BUTTON), RTDButtonISR, CHANGE);
 }
@@ -102,7 +102,7 @@ void SetupInterrupts() {
 /*-----------------------------------------------------------------------------
  Set shutdown circuit error high
 -----------------------------------------------------------------------------*/
-void ShutdownCircuitISR() {
+void ShutdownCircuitISR(void) {
     // Set SDC error flag high
     IRQHandler::SetShutdownState(true);
 
@@ -113,7 +113,7 @@ void ShutdownCircuitISR() {
 /*-----------------------------------------------------------------------------
  Set a flag high to initiate RTD button pressed
 -----------------------------------------------------------------------------*/
-void RTDButtonISR() {
+void RTDButtonISR(void) {
     // Get current system run time
     static uint32_t pressStartTime = millis();
 
@@ -133,7 +133,7 @@ void RTDButtonISR() {
 /*-----------------------------------------------------------------------------
  Toggle the LED on the EV1.5 ECU PCB indicating an error
 -----------------------------------------------------------------------------*/
-void ToggleFaultLED() {
+void ToggleFaultLED(void) {
     // Toggle the LED
     EV1_5_TOGGLE_FAULT_LED();
 }
@@ -141,7 +141,7 @@ void ToggleFaultLED() {
 /*-----------------------------------------------------------------------------
   Set the fault LED to fade in and out
 -----------------------------------------------------------------------------*/
-void CalibrationHeartbeat() {
+void CalibrationHeartbeat(void) {
     static bool bIncreaseDutyCycle = true;
     static uint8_t PWMCounter = 0;
     static uint8_t currentDutyCycle = 0;
@@ -184,7 +184,7 @@ void CalibrationHeartbeat() {
 /*-----------------------------------------------------------------------------
  Evalues bit zero of error buffer (Shutdown circuit error)
 -----------------------------------------------------------------------------*/
-bool ShutdownCircuitOpen() {
+bool ShutdownCircuitOpen(void) {
     // Check if shutdown circuit open
     return IRQHandler::GetErrorBuffer() & (1 << ERROR_CODE_SHUTDOWN);
 }
@@ -192,7 +192,7 @@ bool ShutdownCircuitOpen() {
 /*-----------------------------------------------------------------------------
  Evalues bit one of error buffer (APPS signal agreement error)
 -----------------------------------------------------------------------------*/
-bool PedalsDisagree() {
+bool PedalsDisagree(void) {
     // Check if pedals disagree
     return IRQHandler::GetErrorBuffer() & (1 << ERROR_CODE_DISAGREE);
 }
@@ -200,7 +200,7 @@ bool PedalsDisagree() {
 /*-----------------------------------------------------------------------------
  Evalues bit three of error buffer (Both pedals pressed error)
 -----------------------------------------------------------------------------*/
-bool BothPedalsPressed() {
+bool BothPedalsPressed(void) {
     // Check if both pedals are pressed
     return IRQHandler::GetErrorBuffer() & (1 << ERROR_CODE_APPS_BSE);
 }
@@ -208,7 +208,7 @@ bool BothPedalsPressed() {
 /*-----------------------------------------------------------------------------
  Evalues bit four of error buffer (Pedals out of range error)
 -----------------------------------------------------------------------------*/
-bool PedalsOOR() {
+bool PedalsOOR(void) {
     // Check if pedals are out of range
     return IRQHandler::GetErrorBuffer() & (1 << ERROR_CODE_OOR);
 }

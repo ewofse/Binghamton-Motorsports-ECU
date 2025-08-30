@@ -5,8 +5,15 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
+#include <stdint.h>
+
+#include "interrupts/interrupts.h"
 #include "sensors/hall.h"
+#include "comms/CAN.h"
+#include "daq/DAQ.h"
+#include "general.h"
 #include "pump.h"
+#include "pin.h"
 
 /*-------------------------------------------------------------------------------------------------
  System Data
@@ -14,43 +21,43 @@
 class systemData {
     public:
         // Constructor
-        systemData();
+        systemData(void);
 
         // Getters
-        hall GetAPPS1() { return APPS1; }
-        hall GetAPPS2() { return APPS2; }
-        hall GetBSE() { return BSE; }
+        hall GetAPPS1(void) { return APPS1; }
+        hall GetAPPS2(void) { return APPS2; }
+        hall GetBSE(void) { return BSE; }
 
-        pumpController GetPumpController() { return pump; }
+        pumpController GetPumpController(void) { return pump; }
 
-        elapsedMillis GetResetTimer() { return timers.resetTimer; }
-        bool GetResetTimerFlag() { return timers.bResetTimerStarted; }
+        elapsedMillis GetResetTimer(void) { return timers.resetTimer; }
+        bool GetResetTimerFlag(void) { return timers.bResetTimerStarted; }
 
-        elapsedMillis GetBuzzerTimer() { return timers.buzzerTimer; }
-        bool GetBuzzerTimerFlag() { return timers.bBuzzerActive; }
+        elapsedMillis GetBuzzerTimer(void) { return timers.buzzerTimer; }
+        bool GetBuzzerTimerFlag(void) { return timers.bBuzzerActive; }
 
-        elapsedMillis GetChargeTimer() { return timers.chargeTimer; }
-        bool GetChargeTimerFlag() { return timers.bChargeTimerStarted; }
+        elapsedMillis GetChargeTimer(void) { return timers.chargeTimer; }
+        bool GetChargeTimerFlag(void) { return timers.bChargeTimerStarted; }
 
-        bool Get100msFlag() { return timers.b100msPassed; }
+        bool Get100msFlag(void) { return timers.b100msPassed; }
 
-        digitalPin & GetRTDButtonPin() { return pinRTDButton; }
-        analogPin & GetSDCTapPin() { return pinSDCTap; }
+        digitalPin & GetRTDButtonPin(void) { return pinRTDButton; }
+        analogPin & GetSDCTapPin(void) { return pinSDCTap; }
 
-        digitalPin & GetRUNPin() { return pinRUN; }
-        digitalPin & GetGOPin() { return pinRFE; }
-        digitalPin & GetRTDBuzzerPin() { return pinRTDBuzzer; }
-        digitalPin & GetBrakeLightPin() { return pinBrakeLight; }
-        digitalPin & GetResetPin() { return pinReset; }
+        digitalPin & GetRUNPin(void) { return pinRUN; }
+        digitalPin & GetGOPin(void) { return pinRFE; }
+        digitalPin & GetRTDBuzzerPin(void) { return pinRTDBuzzer; }
+        digitalPin & GetBrakeLightPin(void) { return pinBrakeLight; }
+        digitalPin & GetResetPin(void) { return pinReset; }
 
-        digitalPin & GetAIRPlusPin() { return pinAIRPlus; }
+        digitalPin & GetAIRPlusPin(void) { return pinAIRPlus; }
 
-        digitalPin & GetPumpPin() { return pinPump; }
-        digitalPin & GetPumpSwitchPin() { return pinPumpSwitch; }
-        digitalPin & GetFaultLEDPin() { return pinFaultLED; }
+        digitalPin & GetPumpPin(void) { return pinPump; }
+        digitalPin & GetPumpSwitchPin(void) { return pinPumpSwitch; }
+        digitalPin & GetFaultLEDPin(void) { return pinFaultLED; }
 
-        uint8_t GetStateBuffer() { return stateBuf; }
-        uint8_t GetFaultBuffer() { return faultBuf; }
+        uint8_t GetStateBuffer(void) { return stateBuf; }
+        uint8_t GetFaultBuffer(void) { return faultBuf; }
 
         // Setters
         void SetAPPS1(hall sensor) { APPS1 = sensor; }
@@ -72,43 +79,43 @@ class systemData {
         void SetFaultBuffer(uint8_t value) { faultBuf = value; }
 
         // Data methods
-        void ActivateBrakeLight();
+        void ActivateBrakeLight(void);
 
-        bool ReadyToDrive();
+        bool ReadyToDrive(void);
 
-        void ActivateBamocar();
+        void ActivateBamocar(void);
 
-        void DeactivateBamocar();
+        void DeactivateBamocar(void);
 
         void ProcessAPPS(uint8_t * pTorqueRequest);
 
-        void UpdatePedalStructures();
+        void UpdatePedalStructures(void);
 
-        void UpdateSDCTapBuffer();
+        void UpdateSDCTapBuffer(void);
 
-        float GetLowerPercentAPPS();
+        float GetLowerPercentAPPS(void);
 
-        bool CheckAPPS();
+        bool CheckAPPS(void);
 
-        bool CheckPedalsOOR();
+        bool CheckPedalsOOR(void);
 
-        bool CheckPedalPlausibility();
+        bool CheckPedalPlausibility(void);
         
-        bool CheckPedalImplausibility();
+        bool CheckPedalImplausibility(void);
 
-        bool CheckAllErrors();
+        bool CheckAllErrors(void);
 
-        bool SetPedalBounds();
+        bool SetPedalBounds(void);
 
-        void CalibratePedals();
+        void CalibratePedals(void);
 
-        void CalibrateMotor();
+        void CalibrateMotor(void);
 
         void RampPump(bool direction);
 
-        void RunPump();
+        void RunPump(void);
 
-        void DebugPrintErrors();
+        void DebugPrintErrors(void);
 
     private:
         // Hall sensor objects
@@ -150,32 +157,32 @@ class systemData {
 class systemVehicle {
     public:
         // Constructor
-        systemVehicle();
+        systemVehicle(void);
 
         // Getters
-        systemData GetSystemData() { return system; }
+        systemData GetSystemData(void) { return system; }
 
         // Methods
-        void ProcessState();
+        void ProcessState(void);
 
     private:
         // State methods
-        void PEDALS();
-        void INIT();
-        void PRECHARGE();
-        void RTD();
-        void IDLE();
-        void DRIVE();
-        void BRAKE();
-        void FAULT();
-        void CALIBRATE_PEDALS();
-        void CALIBRATE_MOTOR();
+        void PEDALS(void);
+        void INIT(void);
+        void PRECHARGE(void);
+        void RTD(void);
+        void IDLE(void);
+        void DRIVE(void);
+        void BRAKE(void);
+        void FAULT(void);
+        void CALIBRATE_PEDALS(void);
+        void CALIBRATE_MOTOR(void);
 
         // All data modified and used within system
         systemData system;
 
         // Declare a function pointer to point to state member functions
-        void (systemVehicle::*state)();
+        void (systemVehicle::*state)(void);
 };
 
 // End safe guards

@@ -3,7 +3,7 @@
 /*-----------------------------------------------------------------------------
  Activate brake light when BSE is pressed
 -----------------------------------------------------------------------------*/
-void systemData::ActivateBrakeLight() {
+void systemData::ActivateBrakeLight(void) {
     // Check if brake is significantly pressed to activate brake light
     if ( BSE.GetPercentRequest() * 100 > PERCENT_BRAKE ) {
         pinBrakeLight.WriteOutput(HIGH);
@@ -15,7 +15,7 @@ void systemData::ActivateBrakeLight() {
 /*----------------------------------------------------------------------------- 
  Update pedal data for all hall sensors
 -----------------------------------------------------------------------------*/
-void systemData::UpdatePedalStructures() {
+void systemData::UpdatePedalStructures(void) {
     // Update pedal data for each hall sensor
     APPS1.UpdatePedalData();
     APPS2.UpdatePedalData();
@@ -25,7 +25,7 @@ void systemData::UpdatePedalStructures() {
 /*----------------------------------------------------------------------------- 
  Sample the SDC tap
 -----------------------------------------------------------------------------*/
-void systemData::UpdateSDCTapBuffer() {
+void systemData::UpdateSDCTapBuffer(void) {
     // Get the signal buffer
     circularBuffer buffer = pinSDCTap.GetBuffer();
 
@@ -39,7 +39,7 @@ void systemData::UpdateSDCTapBuffer() {
 /*-----------------------------------------------------------------------------
  Check OOR & signal agreement - Returns true if error lasts for over 100 ms
 -----------------------------------------------------------------------------*/
-bool systemData::CheckPedalImplausibility() {
+bool systemData::CheckPedalImplausibility(void) {
     static elapsedMillis pedalErrorTimer = 0;
     static bool bPedalError = false;
     bool bResult = false;
@@ -69,7 +69,7 @@ bool systemData::CheckPedalImplausibility() {
 /*-----------------------------------------------------------------------------
  Check for driver RTD input
 -----------------------------------------------------------------------------*/
-bool systemData::ReadyToDrive() {
+bool systemData::ReadyToDrive(void) {
     // Get the brake percent request and RTD button reading
     float brakeRequest = BSE.GetPercentRequest() * 100;
     bool bRTDButtonPressed = pinRTDButton.ReadPulsedPin( pinRTDButton.ReadDebouncedPin() );
@@ -81,7 +81,7 @@ bool systemData::ReadyToDrive() {
 /*-----------------------------------------------------------------------------
  Activate motor controller
 -----------------------------------------------------------------------------*/
-void systemData::ActivateBamocar() {
+void systemData::ActivateBamocar(void) {
 	// Digital parameters required by the motor controller to drive
 	pinRUN.WriteOutput(HIGH);
 	pinRFE.WriteOutput(HIGH);
@@ -90,7 +90,7 @@ void systemData::ActivateBamocar() {
 /*-----------------------------------------------------------------------------
  Deactivate motor controller
 -----------------------------------------------------------------------------*/
-void systemData::DeactivateBamocar() {
+void systemData::DeactivateBamocar(void) {
 	// Digital parameters required by the motor controller to drive
 	pinRUN.WriteOutput(LOW);
 	pinRFE.WriteOutput(LOW);
@@ -117,7 +117,7 @@ void systemData::ProcessAPPS(uint8_t * pTorqueBuf) {
 /*----------------------------------------------------------------------------- 
  Get the lower percent request
 -----------------------------------------------------------------------------*/
-float systemData::GetLowerPercentAPPS() {
+float systemData::GetLowerPercentAPPS(void) {
     // Get the two APPS percent requests
     float requestAPPS1 = APPS1.GetPercentRequest();
     float requestAPPS2 = APPS2.GetPercentRequest();
@@ -129,7 +129,7 @@ float systemData::GetLowerPercentAPPS() {
 /*-----------------------------------------------------------------------------
  Compare accelerator pedal positions - Returns true if signals agree
 -----------------------------------------------------------------------------*/
-bool systemData::CheckAPPS() {
+bool systemData::CheckAPPS(void) {
     // Get the two APPS percent requests
     float requestAPPS1 = APPS1.GetPercentRequest();
     float requestAPPS2 = APPS2.GetPercentRequest();
@@ -141,7 +141,7 @@ bool systemData::CheckAPPS() {
 /*-----------------------------------------------------------------------------
  Check for pedals OOR - Returns true if any signals are OOR
 -----------------------------------------------------------------------------*/
-bool systemData::CheckPedalsOOR() {
+bool systemData::CheckPedalsOOR(void) {
     // Check if pedals are out of range
 	return APPS1.CheckPedalOOR() || APPS2.CheckPedalOOR() || BSE.CheckPedalOOR();
 }
@@ -149,7 +149,7 @@ bool systemData::CheckPedalsOOR() {
 /*-----------------------------------------------------------------------------
  APPS BSE error check - Returns true if APPS & BSE are pressed
 -----------------------------------------------------------------------------*/
-bool systemData::CheckPedalPlausibility() {
+bool systemData::CheckPedalPlausibility(void) {
     // Get the APPS and BSE percent requests
     float requestAPPS = GetLowerPercentAPPS() * 100;
     float requestBSE = BSE.GetPercentRequest() * 100;
@@ -161,7 +161,7 @@ bool systemData::CheckPedalPlausibility() {
 /*-----------------------------------------------------------------------------
  Check All Errors - Returns true if any errors occur
 -----------------------------------------------------------------------------*/
-bool systemData::CheckAllErrors() {
+bool systemData::CheckAllErrors(void) {
     bool bResult = false;
     uint8_t errors = IRQHandler::GetErrorBuffer();
 
@@ -207,7 +207,7 @@ bool systemData::CheckAllErrors() {
 /*-----------------------------------------------------------------------------
  Extract encoded values from SD file to set bounds for percent requests
 -----------------------------------------------------------------------------*/
-bool systemData::SetPedalBounds() {
+bool systemData::SetPedalBounds(void) {
     bool bSuccessfulLoad = false;
     size_t bufferLength;
 
@@ -292,7 +292,7 @@ void systemData::RampPump(bool direction) {
 /*-----------------------------------------------------------------------------
  Turn pump on using precharge circuitry
 -----------------------------------------------------------------------------*/
-void systemData::RunPump() {
+void systemData::RunPump(void) {
     static uint32_t prechargeTimer = millis();
     static bool bPumpActivated = false;
 
@@ -325,7 +325,7 @@ void systemData::RunPump() {
 /*-----------------------------------------------------------------------------
  Output what errors occurred during a fault condition
 -----------------------------------------------------------------------------*/
-void systemData::DebugPrintErrors() {
+void systemData::DebugPrintErrors(void) {
     // Set the fault buffer from interrupt error buffer
     faultBuf = IRQHandler::GetErrorBuffer();
 

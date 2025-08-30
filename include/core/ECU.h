@@ -5,13 +5,17 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries - Master Include
 -------------------------------------------------------------------------------------------------*/
-#include "general.h"
-#include "pin.h"
-#include "comms/CAN.h"
+#include "core/general.h"
+#include "core/pin.h"
+#include "core/FSM.h"
+
 #include "interrupts/interrupts.h"
+
+#include "comms/CAN.h"
+
 #include "daq/DAQ.h"
+
 #include "sensors/hall.h"
-#include "FSM.h"
 
 // End safe guards
 #endif /* ECU_H */

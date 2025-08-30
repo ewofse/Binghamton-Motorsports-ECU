@@ -5,7 +5,9 @@
 /*-------------------------------------------------------------------------------------------------
  Libraries
 -------------------------------------------------------------------------------------------------*/
-#include "general.h"
+#include <Arduino.h>
+#include <stdint.h>
+
 #include "sensors/buffer.h"
 
 /*------------------------------------------
@@ -93,7 +95,7 @@ class GPIO {
         GPIO(const uint8_t pinValue, bool bPinMode);
 
         // Getters
-        uint8_t GetPin() { return pin; }
+        uint8_t GetPin(void) { return pin; }
 
         // Setters
         void SetPinMode(bool value) { pinMode(pin, value); }
@@ -114,8 +116,8 @@ class digitalPin : public GPIO {
 
         // Data methods
         void WriteOutput(bool bValue) { digitalWriteFast(pin, bValue); }
-        bool ReadRawPinDigital() { return digitalReadFast(pin); }
-        bool ReadDebouncedPin();
+        bool ReadRawPinDigital(void) { return digitalReadFast(pin); }
+        bool ReadDebouncedPin(void);
         bool ReadPulsedPin(bool signal);
     
     private:
@@ -136,14 +138,14 @@ class analogPin : public GPIO {
         analogPin(const uint8_t pinValue, bool bPinMode, size_t size);
 
         // Getters
-        circularBuffer GetBuffer() { return buffer; }
+        circularBuffer GetBuffer(void) { return buffer; }
 
         // Setters
         void SetBuffer(circularBuffer data) { buffer = data; }
 
         // Data methods
         void SetOutput(uint8_t value) { analogWrite(pin, value); }
-        uint16_t ReadRawPinAnalog() { return analogRead(pin); }
+        uint16_t ReadRawPinAnalog(void) { return analogRead(pin); }
     
     private:
         // Circular buffer to average signal
